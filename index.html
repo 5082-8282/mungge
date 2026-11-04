@@ -301,6 +301,14 @@ h3{font-size:15px}
 .welcome{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;margin-bottom:12px}
 .welcome p{margin:4px 0 10px;font-size:14px}
 @media (max-width:560px){.welcome{grid-template-columns:1fr}.welcome svg{display:none}}
+.banner .lock{display:inline-flex;color:var(--alert)}
+.banner.calm .lock{color:var(--accent)}
+.remrow{display:grid;grid-template-columns:1fr auto auto auto;gap:6px 8px;align-items:center;padding:10px;border-radius:12px;background:var(--soft)}
+.remrow > input[type=text]{grid-column:1/-1}
+.remrow label{display:grid;gap:2px;font-size:12px;color:var(--muted)}
+.remrow select,.remrow input[type=date]{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 8px;min-width:0}
+.remrow .tag{grid-column:1/-2}
+@media (max-width:560px){.remrow{grid-template-columns:1fr 1fr}.remrow .tag{grid-column:1/2}}
 /* 퇴근 셔터 */
 .hero{position:relative}
 .say-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
@@ -420,8 +428,13 @@ function summarize(docs) {
   const catName = id => { const c = (st.cats || []).find(x => x.id === id); return c && c.name ? String(c.name).replace(/ ?업무$/, "") : "기타"; };
   const focus = tasks.find(t => t.id === day.focus && !t.done);
   const topT = tasks.find(t => t.top);
+  /* 정기 알림 (예: 3개월마다 비밀번호): 미리 알림 기간이면 위젯에도 표시 */
+  const addM = (k, n) => { const [y, m, d] = k.split("-").map(Number); const dt = new Date(y, m - 1 + Number(n || 3), 1); const last = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); dt.setDate(Math.min(d, last)); return dt; };
+  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const reminds = (st.reminders || []).filter(r => r.last && r.text).map(r => ({ text: r.text, left: Math.round((addM(r.last, r.months) - today0) / 86400000), notice: Number(r.notice) || 7 }))
+    .filter(x => x.left <= x.notice);
   const closed = !!day.closedAt || !!(st.autoShutter && !day.reopened && nowM >= mins(st.autoShutter));
-  return { st, closed, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
+  return { st, closed, reminds, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
 }
 
 /* ---------- 그리기 ---------- */
@@ -532,12 +545,21 @@ function listBox(parent, s, opt) {
   head.addSpacer();
   if (s.total) txt(head, `${s.done}/${s.total}`, 9.5, C.muted, "semi");
   box.addSpacer(5);
+  let max = opt.max;
+  (s.reminds || []).slice(0, 1).forEach(x => {
+    const r = box.addStack(); r.centerAlignContent();
+    icon(r, "lock.fill", 9, x.left <= 0 ? C.alert : C.accent);
+    r.addSpacer(4);
+    txt(r, `${x.text} ${x.left > 0 ? "D-" + x.left : x.left === 0 ? "오늘" : -x.left + "일 지남"}`, opt.size - 1, x.left <= 0 ? C.alert : C.accent, "semi");
+    box.addSpacer(opt.gap + 1);
+    max = Math.max(1, max - 1);
+  });
   if (!s.left.length) {
     txt(box, s.total ? "오늘 할 일 다 했어요!" : "앱에서 할 일을 적어주세요", opt.size, C.accent, "semi", 2);
     box.addSpacer();
     return box;
   }
-  s.left.slice(0, opt.max).forEach((t, i) => {
+  s.left.slice(0, max).forEach((t, i) => {
     if (i) box.addSpacer(opt.gap);
     const row = box.addStack();
     row.centerAlignContent();
@@ -546,7 +568,7 @@ function listBox(parent, s, opt) {
     /* 순위는 숫자 대신 글씨 굵기로: 1순위 가장 굵게 → 2순위 → 3순위 → 나머지 보통 */
     txt(row, t.text, opt.size, C.ink, ["", "bold", "semi", "medium"][rk(t)] || "", 1);
   });
-  if (s.left.length > opt.max) { box.addSpacer(opt.gap); txt(box, `외 ${s.left.length - opt.max}개`, 9.5, C.muted); }
+  if (s.left.length > max) { box.addSpacer(opt.gap); txt(box, `외 ${s.left.length - max}개`, 9.5, C.muted); }
   box.addSpacer();
   return box;
 }
@@ -733,6 +755,7 @@ Script.complete();
 /* ---------- 기본값 ---------- */
 const DEFAULT_SETTINGS = {
   v:2, start:'14:00', end:'17:50', mailEvery:30, leftover:'carry', autoShutter:'',
+  reminders:[{id:'r1', text:'전체 비밀번호 바꾸기', last:'2026-09-12', months:3, notice:7}],
   arrive:[
     {id:'a1', text:'출근 문자 보내기'},
     {id:'a2', text:'ERP 구동'},
@@ -809,6 +832,12 @@ function getDay(k){ const d = S.days[k]; if(!d) return blankDay(k);
 const live = t => !t.moved && !t.dropped;
 const rankOf = t => t.rank || (t.top ? 1 : 0);
 /* 셔터: '오늘은 퇴근'을 눌렀거나, 정해둔 시간이 지났을 때 (다시 올렸으면 자동은 무시) */
+/* 정기 알림: 마지막으로 한 날 + N개월 = 다음 날짜 */
+function addMonths(k, n){ const d = parseKey(k), day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth()+Number(n||0)); const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); d.setDate(Math.min(day, last)); return keyOf(d); }
+const daysBetween = (a, b) => Math.round((parseKey(b) - parseKey(a)) / 86400000);
+function reminderInfo(r){ const next = addMonths(r.last, r.months||3); const left = daysBetween(todayKey(), next); return {r, next, left, due: left <= (Number(r.notice)||7)}; }
+const dueReminders = () => (ST().reminders||[]).filter(r => r.last && r.text).map(reminderInfo).filter(x => x.due);
+const dLabel = left => left > 0 ? 'D-'+left : left === 0 ? '오늘' : (-left)+'일 지났어요';
 function isClosed(day){
   if(day.closedAt) return true;
   const a = ST().autoShutter;
@@ -896,6 +925,7 @@ function jarSvg(n, dropLast){
     '</svg>';
 }
 const ICON = {
+  lock:'<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5a4.5 4.5 0 0 1 4.5 4.5v3H17a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h.5V7A4.5 4.5 0 0 1 12 2.5zm0 2A2.5 2.5 0 0 0 9.5 7v3h5V7A2.5 2.5 0 0 0 12 4.5zm0 9a1.5 1.5 0 0 0-.75 2.8V18h1.5v-1.7A1.5 1.5 0 0 0 12 13.5z"/></svg>',
   play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
   star:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.6l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z"/></svg>',
   next:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
@@ -1036,6 +1066,7 @@ function checkAlarms(){
   mailSlots().forEach(t => { if(!slotOk(day,t)) due.push([t, t+' 메일·결재 확인', '샘플실 메일함이랑 결재함을 확인할 시간이에요']); });
   closingToday(k).forEach(c => { if(c.time) due.push([c.time, c.time+' '+c.text, c.text==='퇴근' ? '오늘도 수고했어요!' : '마감 할 일이에요']); });
   if(isMonday(k)){ const m = ST().close.find(c => c.mon); if(m) due.push([hhmm(firstCloseMins()), '월요일 할 일', m.text]); }
+  dueReminders().forEach(x => due.push([ST().start, x.r.text+' '+dLabel(x.left), fmtDate(x.next)+'까지예요']));
   due.forEach(([t,title,body]) => {
     const key = k+'|'+t+'|'+title;
     const m = minsOf(t);
@@ -1138,6 +1169,9 @@ function alertsHTML(){
   }
   return out.join('');
 }
+function remindersHTML(){
+  return dueReminders().map(x => '<div class="banner '+(x.left<=0?'':'calm')+' remind"><span class="lock">'+ICON.lock+'</span><div class="msg"><b>'+esc(x.r.text)+' · '+dLabel(x.left)+'</b>'+fmtDate(x.next)+'까지예요. 마지막으로 바꾼 날은 '+fmtDate(x.r.last)+'이에요.</div><button class="btn main sm" data-act="remDone" data-id="'+x.r.id+'">오늘 바꿨어요</button></div>').join('');
+}
 function leftoverHTML(){
   const k = todayKey();
   const keys = Object.keys(S.days).filter(x => x < k && x >= addDays(k,-14)).sort().reverse();
@@ -1238,7 +1272,7 @@ function renderToday(){
   return welcomeHTML()+
     '<section class="hero" id="clock">'+clockHTML()+'</section>'+
     '<div id="alerts">'+alertsHTML()+'</div>'+
-    leftoverHTML()+(arrTop ? arriveHTML(day) : '')+
+    remindersHTML()+leftoverHTML()+(arrTop ? arriveHTML(day) : '')+
     '<div class="cols"><section class="card"><div class="card-head"><h2>오늘 할 일</h2><span class="count">'+done+' / '+liveT.length+'</span>'+
       (day.wrapped ? '<button class="btn sm right" data-act="unwrap">마무리 다시 열기</button>' : '<button class="btn sm right" data-act="openWrap">오늘 마무리</button>')+'</div>'+
       filt+addFormHTML('today')+
@@ -1330,6 +1364,14 @@ function renderSettings(){
     '<div class="field"><span class="lbl">일하는 시간</span><div class="row"><input type="time" id="set-start" data-act="setTime" data-f="start" value="'+esc(st.start)+'"> ~ <input type="time" id="set-end" data-act="setTime" data-f="end" value="'+esc(st.end)+'"> <span class="tag">끝나는 시간 = 퇴근</span></div></div>'+
     '<div class="field"><span class="lbl">샘플실 메일·결재 확인 간격</span><div class="seg" role="group">'+[15,20,30,60].map(m => '<button data-act="mailEvery" data-v="'+m+'" aria-pressed="'+(Number(st.mailEvery)===m)+'">'+m+'분</button>').join('')+'</div><p class="sub" style="margin:0">'+esc(st.start)+'부터 '+esc(st.end)+' 전까지 '+mailSlots().length+'번 알려줘요.</p></div>'+
     '<p class="sub">출근하면 먼저 할 일과 마감할 때 할 일은 오늘 화면의 각 카드에서 "수정"을 눌러 바꿀 수 있어요.</p>'+
+    '<div class="field"><span class="lbl">정기 알림</span><p class="sub" style="margin:0">몇 달마다 돌아오는 일을 적어두면, 정한 날 며칠 전부터 오늘 화면과 위젯에 알려줘요.</p><div class="edit-list">'+
+      (st.reminders||[]).map((r,i) => { const x = reminderInfo(r);
+        return '<div class="remrow"><input type="text" id="rem-t-'+r.id+'" data-act="remText" data-i="'+i+'" value="'+esc(r.text)+'" aria-label="알림 이름">'+
+          '<label>마지막으로 한 날<input type="date" id="rem-l-'+r.id+'" data-act="remLast" data-i="'+i+'" value="'+esc(r.last)+'"></label>'+
+          '<label>반복<select id="rem-m-'+r.id+'" data-act="remMonths" data-i="'+i+'">'+[1,2,3,6,12].map(m => '<option value="'+m+'"'+(Number(r.months)===m?' selected':'')+'>'+m+'개월마다</option>').join('')+'</select></label>'+
+          '<label>미리 알림<select id="rem-n-'+r.id+'" data-act="remNotice" data-i="'+i+'">'+[3,7,14].map(m => '<option value="'+m+'"'+(Number(r.notice||7)===m?' selected':'')+'>'+m+'일 전부터</option>').join('')+'</select></label>'+
+          '<span class="tag">다음: '+fmtDate(x.next)+' ('+dLabel(x.left)+')</span><button class="ib" data-act="remDel" data-i="'+i+'" aria-label="지우기">'+ICON.x+'</button></div>'; }).join('')+
+      '</div><div class="row"><button class="btn sm" data-act="remAdd">정기 알림 추가</button></div></div>'+
     '<div class="field"><span class="lbl">셔터 자동으로 내리기</span><p class="sub" style="margin:0">퇴근 버튼을 깜빡해도 이 시간이 되면 앱과 위젯에 셔터가 내려가요. 일이 늦게 끝나는 날엔 비워두고 "오늘은 퇴근"을 직접 눌러요.</p><div class="row"><input type="time" id="set-auto" data-act="setAuto" value="'+esc(st.autoShutter||'')+'" aria-label="셔터 내릴 시간">'+(st.autoShutter?'<button class="btn sm ghost" data-act="autoShutterOff">자동 안 함</button>':'<span class="tag">지금은 자동으로 안 내려요</span>')+'</div></div>'+
     '<div class="field"><span class="lbl">못 끝낸 일 기본 처리</span><div class="seg" role="group"><button data-act="leftover" data-v="carry" aria-pressed="'+(st.leftover==='carry')+'">내일로 넘기기</button><button data-act="leftover" data-v="drop" aria-pressed="'+(st.leftover==='drop')+'">보내주기</button></div></div>'+
     '<div class="field"><span class="lbl">카테고리</span><div style="display:grid;gap:8px">'+cats+'</div><div class="row"><input type="text" id="cat-new" data-enter="catAdd" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름"><button class="btn sm" data-act="catAdd">추가</button></div></div>'+
@@ -1377,7 +1419,7 @@ function storageSettingsHTML(){
 function render(force){
   if(!S.loaded) return;
   const ae = document.activeElement;
-  const typing = ae && ((ae.tagName==='INPUT' && (ae.type==='text' || ae.type==='time')) || ae.tagName==='TEXTAREA');
+  const typing = ae && ((ae.tagName==='INPUT' && (ae.type==='text' || ae.type==='time' || ae.type==='date')) || ae.tagName==='TEXTAREA');
   if(typing && !force){ S.deferred = true; return; }
   const fid = ae && ae.id, sel = typing && ae.type==='text' ? [ae.selectionStart, ae.selectionEnd] : null;
   let body;
@@ -1526,6 +1568,10 @@ const actions = {
   },
   openShutter: () => { mutateDay(todayKey(), d => { delete d.closedAt; d.reopened = true; }); toast('셔터를 다시 올렸어요'); },
   autoShutterOff: () => mutateSettings(st => { st.autoShutter = ''; }),
+  remDone: el => { const k = todayKey(); let name = ''; mutateSettings(st => { const r = (st.reminders||[]).find(x => x.id===el.dataset.id); if(r){ r.last = k; name = r.text; } });
+    const r = (ST().reminders||[]).find(x => x.id===el.dataset.id); toast('기록했어요. 다음은 '+fmtDate(addMonths(k, r ? r.months : 3))); },
+  remDel: el => mutateSettings(st => { st.reminders.splice(Number(el.dataset.i),1); }),
+  remAdd: () => mutateSettings(st => { st.reminders = st.reminders || []; st.reminders.push({id:'r'+uid(), text:'새 정기 알림', last:todayKey(), months:3, notice:7}); }),
   bringLeft: el => {
     const pk = el.dataset.k, k = todayKey(), copies = [];
     mutateDay(pk, day => { day.tasks.forEach(t => { if(!t.done && live(t)){ t.moved = k; copies.push({id:uid(), text:t.text, cat:t.cat, pri:t.pri, top:false, done:false, from:pk, c:Date.now()+copies.length}); } }); day.wrapped = true; }, true);
@@ -1578,6 +1624,10 @@ document.addEventListener('change', e => {
   const i = Number(el.dataset.i);
   if(act==='draftCat'){ S.draft[el.dataset.ctx].cat = el.value; return; }
   if(act==='draftPri'){ S.draft[el.dataset.ctx].pri = Number(el.value); return; }
+  if(act==='remText'){ const v = el.value.trim(); if(v) mutateSettings(st => { st.reminders[i].text = v; }); return; }
+  if(act==='remLast'){ if(el.value) mutateSettings(st => { st.reminders[i].last = el.value; }); return; }
+  if(act==='remMonths'){ mutateSettings(st => { st.reminders[i].months = Number(el.value); }); return; }
+  if(act==='remNotice'){ mutateSettings(st => { st.reminders[i].notice = Number(el.value); }); return; }
   if(act==='setAuto'){ mutateSettings(st => { st.autoShutter = el.value || ''; }); return; }
   if(act==='setTime'){ const v = el.value; if(v) mutateSettings(s => { s[el.dataset.f] = v; }); return; }
   if(act==='catName'){ const v = el.value.trim(); if(v) mutateSettings(s => { s.cats[i].name = v; }); return; }
