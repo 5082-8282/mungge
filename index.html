@@ -381,8 +381,9 @@ function summarize(docs) {
   const closeNext = (st.close || []).filter(c => c.time && mins(c.time) >= nowM)
     .sort((a, b) => mins(a.time) - mins(b.time))[0];
   const color = id => { const c = (st.cats || []).find(x => x.id === id); return new Color(CAT[(c && c.color) || "sand"] || CAT.sand); };
+  const catName = id => { const c = (st.cats || []).find(x => x.id === id); return c && c.name ? String(c.name).replace(/ ?업무$/, "") : "기타"; };
   const focus = tasks.find(t => t.id === day.focus && !t.done);
-  return { st, left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
+  return { st, catName, left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
 }
 
 /* ---------- 그리기 ---------- */
@@ -402,70 +403,118 @@ function icon(stack, name, size, color) {
   img.tintColor = color;
   return img;
 }
-function header(w, s) {
+/* 오늘 모은 구름이 쌓인 유리병 */
+function jarImage(n) {
+  const W = 120, H = 156, dc = new DrawContext();
+  dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
+  const P = (x, y) => new Point(x, y);
+  const body = () => { const p = new Path(); p.move(P(36, 30)); p.addLine(P(84, 30)); p.addLine(P(84, 38)); p.addQuadCurve(P(106, 68), P(106, 44)); p.addLine(P(106, 132)); p.addQuadCurve(P(90, 148), P(106, 148)); p.addLine(P(30, 148)); p.addQuadCurve(P(14, 132), P(14, 148)); p.addLine(P(14, 68)); p.addQuadCurve(P(36, 38), P(14, 44)); p.closeSubpath(); return p; };
+  dc.addPath(body()); dc.setFillColor(new Color("#3D8FD1", 0.10)); dc.fillPath();
+  const tints = ["#FFFFFF", "#E6F3FC", "#FFFFFF", "#CFE6F8", "#FFFFFF", "#E6F3FC"];
+  const cloud = (x, y, sc, fill) => {
+    dc.setFillColor(new Color(fill));
+    [[7.5, 14.5, 3.6], [12, 11, 5], [16.8, 13.8, 4.2]].forEach(([cx, cy, r]) => dc.fillEllipse(new Rect(x + (cx - r) * sc, y + (cy - r) * sc, r * 2 * sc, r * 2 * sc)));
+    dc.fillRect(new Rect(x + 7.5 * sc, y + 13 * sc, 9.3 * sc, 5.1 * sc));
+  };
+  const shown = Math.min(n, 21);
+  for (let i = 0; i < shown; i++) {
+    const row = Math.floor(i / 3), col = i % 3;
+    const x = 14 + col * 26 + (row % 2 ? 8 : 0), y = 114 - row * 13;
+    cloud(x, y + 1.3, 1.3, "#8CBDE6");
+    cloud(x, y, 1.3, tints[i % tints.length]);
+  }
+  dc.addPath(body()); dc.setStrokeColor(new Color("#3D8FD1", 0.55)); dc.setLineWidth(2); dc.strokePath();
+  const hl = new Path(); hl.move(P(24, 70)); hl.addQuadCurve(P(36, 48), P(24, 54));
+  dc.addPath(hl); dc.setStrokeColor(new Color("#FFFFFF", 0.8)); dc.setLineWidth(4); dc.strokePath();
+  const lid = new Path(); lid.addRoundedRect(new Rect(32, 8, 56, 15), 6, 6);
+  dc.addPath(lid); dc.setFillColor(new Color("#3D8FD1")); dc.fillPath();
+  const neck = new Path(); neck.addRoundedRect(new Rect(35, 23, 50, 8), 2, 2);
+  dc.addPath(neck); dc.setFillColor(new Color("#9CCBEF")); dc.fillPath();
+  return dc.getImage();
+}
+function jarBlock(stack, s, h) {
+  const box = stack.addStack();
+  box.layoutVertically();
+  const r = box.addStack(); r.addSpacer();
+  const img = r.addImage(jarImage(s.clouds));
+  img.imageSize = new Size(h * 120 / 156, h);
+  r.addSpacer();
+  box.addSpacer(2);
+  const t = box.addStack(); t.addSpacer();
+  txt(t, `구름 ${s.clouds}개`, 11, C.accent, "bold");
+  t.addSpacer();
+  return box;
+}
+function header(w, compact) {
   const row = w.addStack();
   row.centerAlignContent();
-  icon(row, "cloud.fill", 12, C.accent);
+  icon(row, "cloud.fill", 11, C.accent);
   row.addSpacer(4);
   txt(row, "뭉게뭉게", 11, C.accent, "bold");
   row.addSpacer();
-  icon(row, "cloud", 11, C.muted);
-  row.addSpacer(2);
-  txt(row, s.clouds, 11, C.ink, "bold");
 }
-function countdown(stack, s, size) {
+/* 남은 시간: 작게, 하늘색 */
+function countdown(stack, s, size, stacked) {
   const startD = at(s.st.start), endD = at(s.st.end);
-  let label, target = null;
-  if (now < startD) { label = "출근까지"; target = startD; }
-  else if (now < endD) { label = `퇴근(${s.st.end})까지`; target = endD; }
-  else label = "오늘 근무";
-  txt(stack, label, 11, C.muted, "semi");
-  if (target) {
-    const d = stack.addDate(target);
-    d.applyTimerStyle();
-    d.font = Font.boldRoundedSystemFont(size);
-    d.textColor = C.ink;
-    d.lineLimit = 1;
-    d.minimumScaleFactor = 0.6;
-  } else txt(stack, "끝! 수고했어요", size * 0.62, C.ink, "bold");
+  const row = stack.addStack();
+  if (stacked) row.layoutVertically(); else row.centerAlignContent();
+  if (now < startD) { txt(row, stacked ? "출근까지" : "출근까지 ", size - 3, C.muted, "semi"); }
+  else if (now < endD) { txt(row, stacked ? "퇴근까지" : "퇴근까지 ", size - 3, C.muted, "semi"); }
+  else { txt(row, stacked ? "오늘 끝!" : "오늘 근무 끝! 수고했어요", size - 1, C.accent, "bold"); return; }
+  const d = row.addDate(now < startD ? startD : endD);
+  d.applyTimerStyle();
+  d.font = Font.boldRoundedSystemFont(size);
+  d.textColor = C.accent;
+  d.lineLimit = 1;
+  d.minimumScaleFactor = 0.7;
 }
 function status(stack, s, size) {
   const row = stack.addStack();
   row.centerAlignContent();
   if (s.late) {
-    icon(row, "bell.fill", size, C.alert);
-    row.addSpacer(4);
+    icon(row, "bell.fill", size, C.alert); row.addSpacer(4);
     txt(row, `${s.late} 메일·결재 확인`, size, C.alert, "bold");
   } else if (s.closeNext && mins(s.closeNext.time) - nowM <= 15) {
-    icon(row, "clock.fill", size, C.accent);
-    row.addSpacer(4);
+    icon(row, "clock.fill", size, C.accent); row.addSpacer(4);
     txt(row, `${s.closeNext.time} ${s.closeNext.text}`, size, C.accent, "bold");
   } else if (s.next && now >= at(s.st.start)) {
-    icon(row, "envelope", size, C.muted);
-    row.addSpacer(4);
+    icon(row, "envelope", size, C.muted); row.addSpacer(4);
     txt(row, `다음 메일·결재 ${s.next}`, size, C.muted, "semi");
   } else {
-    icon(row, "checkmark.circle", size, C.muted);
-    row.addSpacer(4);
+    icon(row, "checkmark.circle", size, C.muted); row.addSpacer(4);
     txt(row, `끝낸 일 ${s.done} / ${s.total}`, size, C.muted, "semi");
   }
 }
-function taskRow(stack, s, t, size) {
-  const row = stack.addStack();
-  row.centerAlignContent();
-  const dot = txt(row, t.top ? "★" : "●", t.top ? size - 1 : size - 4, t.top ? C.accent : s.color(t.cat));
-  dot.lineLimit = 1;
-  row.addSpacer(5);
-  txt(row, t.text, size, C.ink, t.top || (s.focus && s.focus.id === t.id) ? "semi" : "", 1);
-}
-function tasksBlock(stack, s, max, size) {
+/* 남은 할 일 요약: 1순위 한 줄 + 카테고리별 개수 */
+function summaryBlock(stack, s, perRow) {
   const head = stack.addStack();
-  txt(head, s.left.length ? `남은 할 일 ${s.left.length}` : "남은 할 일", 11, C.muted, "semi");
+  head.centerAlignContent();
+  txt(head, "남은 할 일 ", 11, C.muted, "semi");
+  txt(head, `${s.left.length}개`, 12, C.ink, "bold");
+  if (s.total) { head.addSpacer(); txt(head, `${s.done}/${s.total} 끝`, 10, C.muted); }
   stack.addSpacer(5);
-  if (!s.left.length) { txt(stack, s.total ? "오늘 할 일 다 했어요!" : "앱에서 할 일을 적어주세요", size, C.accent, "semi", 2); return; }
-  const list = s.focus ? [s.focus].concat(s.left.filter(t => t.id !== s.focus.id)) : s.left;
-  list.slice(0, max).forEach((t, i) => { if (i) stack.addSpacer(4); taskRow(stack, s, t, size); });
-  if (s.left.length > max) { stack.addSpacer(3); txt(stack, `외 ${s.left.length - max}개`, 10, C.muted); }
+  if (!s.left.length) { txt(stack, s.total ? "오늘 할 일 다 했어요!" : "앱에서 할 일을 적어주세요", 12, C.accent, "semi", 2); return; }
+  const lead = s.focus || s.left[0];
+  const r = stack.addStack(); r.centerAlignContent();
+  txt(r, s.focus ? "▶" : (lead.top ? "★" : "●"), 11, s.focus || lead.top ? C.accent : s.color(lead.cat));
+  r.addSpacer(4);
+  txt(r, lead.text, 12.5, C.ink, "semi");
+  stack.addSpacer(6);
+  const counts = {};
+  s.left.forEach(t => { counts[t.cat] = (counts[t.cat] || 0) + 1; });
+  const order = (s.st.cats || []).map(c => c.id).filter(id => counts[id]).concat(Object.keys(counts).filter(id => !(s.st.cats || []).some(c => c.id === id)));
+  for (let i = 0; i < order.length; i += perRow) {
+    const line = stack.addStack(); line.centerAlignContent();
+    order.slice(i, i + perRow).forEach((id, j) => {
+      if (j) line.addSpacer(10);
+      txt(line, "●", 8, s.color(id));
+      line.addSpacer(3);
+      txt(line, s.catName(id), 11, C.ink);
+      line.addSpacer(3);
+      txt(line, counts[id], 11, C.ink, "bold");
+    });
+    stack.addSpacer(3);
+  }
 }
 
 function build(s) {
@@ -476,46 +525,51 @@ function build(s) {
   w.backgroundGradient = g;
   w.url = APP_URL;
   const fam = config.widgetFamily || "medium";
-  w.setPadding(14, 15, 14, 15);
-  header(w, s);
+  w.setPadding(13, 14, 13, 14);
+  header(w);
   w.addSpacer(6);
   if (fam === "small") {
-    countdown(w, s, 26);
+    const top = w.addStack();
+    const col = top.addStack(); col.layoutVertically();
+    countdown(col, s, 16, true);
+    col.addSpacer(4);
+    txt(col, `남은 할 일 ${s.left.length}개`, 11, C.ink, "semi");
+    top.addSpacer();
+    jarBlock(top, s, 58);
     w.addSpacer();
-    const top = s.focus || s.left[0];
     if (s.late) status(w, s, 11);
-    else if (top) { txt(w, s.focus ? "지금 하는 일" : (top.top ? "★ 1순위" : "다음 할 일"), 10, C.muted, "semi"); txt(w, top.text, 13, C.ink, "semi", 2); }
-    else status(w, s, 11);
+    else if (s.left.length) {
+      const lead = s.focus || s.left[0];
+      const r = w.addStack(); r.centerAlignContent();
+      txt(r, s.focus ? "▶" : (lead.top ? "★" : "●"), 10, s.focus || lead.top ? C.accent : s.color(lead.cat));
+      r.addSpacer(4);
+      txt(r, lead.text, 12, C.ink, "semi", 2);
+    } else status(w, s, 11);
   } else {
     const body = w.addStack();
-    const left = body.addStack();
-    left.layoutVertically();
-    left.size = new Size(fam === "large" ? 0 : 128, 0);
-    countdown(left, s, 30);
-    left.addSpacer();
-    status(left, s, 11);
-    body.addSpacer(12);
+    jarBlock(body, s, fam === "large" ? 110 : 92);
+    body.addSpacer(14);
     const right = body.addStack();
     right.layoutVertically();
-    right.backgroundColor = C.soft;
-    right.cornerRadius = 12;
-    right.setPadding(8, 10, 8, 10);
-    tasksBlock(right, s, fam === "large" ? 4 : 3, 13);
+    countdown(right, s, 17);
+    right.addSpacer(8);
+    summaryBlock(right, s, 2);
     right.addSpacer();
+    status(right, s, 11);
     if (fam === "large") {
-      w.addSpacer(10);
+      w.addSpacer(12);
       const box = w.addStack();
       box.layoutVertically();
       box.backgroundColor = C.soft;
       box.cornerRadius = 12;
-      box.setPadding(8, 10, 8, 10);
+      box.setPadding(9, 11, 9, 11);
       txt(box, "마감할 때", 11, C.muted, "semi");
-      box.addSpacer(4);
+      box.addSpacer(5);
       const isMon = now.getDay() === 1;
       (s.st.close || []).filter(c => !c.mon || isMon).forEach(c => {
         const r = box.addStack();
         r.centerAlignContent();
-        const t = txt(r, c.time || "월요일", 12, C.accent, "bold");
+        txt(r, c.time || "월요일", 12, C.accent, "bold");
         r.addSpacer(8);
         txt(r, c.text, 12, c.time && mins(c.time) < nowM ? C.muted : C.ink);
         box.addSpacer(3);
