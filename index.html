@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#F2F9FE">
 <title>뭉게뭉게</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -50,6 +50,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -151,6 +152,8 @@ h3{font-size:15px}
 .side{display:grid;gap:12px}
 @media (max-width:860px){.cols{grid-template-columns:1fr}}
 @media (max-width:560px){
+  /* 아이폰은 글씨가 16px보다 작은 입력칸을 누르면 화면을 확대해요 */
+  input,select,textarea{font-size:16px!important}
   .wrap{padding:18px 22px 64px}
   .card{padding:18px}
   .hero{grid-template-columns:minmax(0,1fr) 104px;gap:12px;padding:16px}
