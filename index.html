@@ -303,7 +303,9 @@ h3{font-size:15px}
 @media (max-width:560px){.welcome{grid-template-columns:1fr}.welcome svg{display:none}}
 /* 퇴근 셔터 */
 .hero{position:relative}
-.gohome{display:inline-flex;align-items:center;gap:5px;margin-left:auto}
+.say-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.say-row .bubble{margin-bottom:0}
+.gohome{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 12px 4px 9px}
 .shutter{grid-column:1/-1;margin:-20px -24px;min-height:220px;position:relative;border-radius:var(--r);overflow:hidden;
   background:repeating-linear-gradient(180deg,#EDF4FA 0 11px,#C9DCEC 11px 12.5px,#E4EFF8 12.5px 14px);
   display:grid;place-items:center;padding:44px 20px 30px;animation:shutterDown .9s cubic-bezier(.3,1.25,.5,1) both}
@@ -1108,10 +1110,10 @@ function clockHTML(){
     ? '<span class="lbl">지금 하는 일</span><b>'+esc(focus.text)+'</b><button class="btn sm" data-act="toggle" data-k="'+k+'" data-id="'+focus.id+'">다 했어요</button>'
     : (top ? '<span class="lbl">오늘의 '+rankOf(top)+'순위</span><b>'+esc(top.text)+'</b><button class="btn sm" data-act="focus" data-k="'+k+'" data-id="'+top.id+'">지금 시작</button>' : '<span class="lbl">아래 할 일에서 ★를 눌러 1·2·3순위를 정해요</span>');
   const goHome = '<button class="btn sm gohome" data-act="goHome">'+cloudSvg(14,'accent')+'오늘은 퇴근</button>';
-  return '<div style="min-width:0"><div class="bubble">'+cloudSvg(18,'accent')+'<span>'+esc(say)+'</span></div>'+
+  return '<div style="min-width:0"><div class="say-row"><div class="bubble">'+cloudSvg(18,'accent')+'<span>'+esc(say)+'</span></div>'+goHome+'</div>'+
     '<div class="clock-label">'+label+'</div><div class="clock-big">'+big+'</div>'+
     '<div class="track" aria-hidden="true"><div class="fill" style="width:'+pct+'%"></div>'+ticks+'<span class="me" style="left:'+pct+'%">'+cloudSvg(30)+'</span></div>'+
-    '<div class="focus-line">'+fl+goHome+'</div></div>'+jarHTML(day);
+    '<div class="focus-line">'+fl+'</div></div>'+jarHTML(day);
 }
 function jarHTML(day){
   const a = acornsOf(day), nx = nextSticker(a), stk = stickerFor(a);
