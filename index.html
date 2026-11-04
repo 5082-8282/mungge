@@ -402,6 +402,7 @@ function summarize(docs) {
 function mkFont(weight, size) {
   const names = weight === "bold" ? ["boldRoundedSystemFont", "boldSystemFont"]
     : weight === "semi" ? ["semiboldRoundedSystemFont", "semiboldSystemFont", "boldSystemFont"]
+    : weight === "medium" ? ["mediumRoundedSystemFont", "mediumSystemFont", "regularRoundedSystemFont", "systemFont"]
     : ["regularRoundedSystemFont", "regularSystemFont", "systemFont"];
   for (const n of names) if (typeof Font[n] === "function") return Font[n](size);
   return Font.systemFont(size);
@@ -491,8 +492,7 @@ function countdown(stack, s, size, stacked) {
   d.lineLimit = 1;
   d.minimumScaleFactor = 0.7;
 }
-/* 흰 박스: 남은 할 일을 순위 순서대로 (카테고리 색 점 + 순위 숫자) */
-const RANK = ["", "①", "②", "③"];
+/* 흰 박스: 남은 할 일을 순위 순서대로 (카테고리 색 점 + 순위는 글씨 굵기) */
 function listBox(parent, s, opt) {
   const box = parent.addStack();
   box.layoutVertically();
@@ -516,8 +516,8 @@ function listBox(parent, s, opt) {
     row.centerAlignContent();
     txt(row, "●", 6.5, s.color(t.cat));
     row.addSpacer(5);
-    if (rk(t)) { txt(row, RANK[rk(t)], opt.size, C.accent, "bold"); row.addSpacer(3); }
-    txt(row, t.text, opt.size, C.ink, rk(t) === 1 ? "semi" : "", 1);
+    /* 순위는 숫자 대신 글씨 굵기로: 1순위 가장 굵게 → 2순위 → 3순위 → 나머지 보통 */
+    txt(row, t.text, opt.size, C.ink, ["", "bold", "semi", "medium"][rk(t)] || "", 1);
   });
   if (s.left.length > opt.max) { box.addSpacer(opt.gap); txt(box, `외 ${s.left.length - opt.max}개`, 9.5, C.muted); }
   box.addSpacer();
