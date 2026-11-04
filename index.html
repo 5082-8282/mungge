@@ -129,7 +129,15 @@ h3{font-size:15px}
 /* arrival */
 .arrive{margin-bottom:12px;border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
 .arrive-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-.arrive-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:var(--soft);border:1px solid transparent;cursor:pointer;font-weight:500;font-size:14.5px;text-align:left}
+.arrive-list{list-style:none;margin:0;padding:0}
+.arrive-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;background:var(--soft);font-weight:500;font-size:14.5px}
+.arrive-item .num{width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.edit-list{display:grid;gap:6px}
+.edit-list input[type=text],.edit-list input[type=time]{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 10px;min-width:0;width:100%}
+.edit-list input:focus{border-color:var(--accent);outline:none}
+.edit-list .erow{grid-template-columns:96px 1fr auto auto}
+.edit-list .erow.simple{grid-template-columns:1fr auto}
+@media (max-width:560px){.edit-list .erow{grid-template-columns:88px 1fr auto}.edit-list .erow .mon-toggle{grid-column:2}}
 .arrive-item:hover{border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
 .arrive-item .box{width:20px;height:20px;border-radius:6px;border:2px solid color-mix(in srgb,var(--accent) 55%,var(--line));display:grid;place-items:center;flex:none;background:var(--card)}
 .arrive-item.ok{background:var(--accent-soft);color:var(--accent-ink)}
@@ -407,7 +415,6 @@ const arriveDone = day => ST().arrive.length>0 && ST().arrive.every(a => day.arr
 function acornsOf(day){
   let n = 0;
   day.tasks.forEach(t => { if(t.done) n += t.top ? 2 : 1; });
-  if(arriveDone(day) || (day.ritual && day.ritual.done)) n += 1;
   Object.keys(day.checks||{}).forEach(t => { if(slotOk(day,t)) n += 1; });
   return n;
 }
@@ -670,7 +677,7 @@ function clockHTML(){
   if(ph==='after') say = day.wrapped ? '오늘도 수고했어요!' : '오늘 끝! 마무리하고 구름 세어봐요';
   else if(cs) say = '마감: '+cs.c.text;
   else if(od) say = od+' 메일·결재 확인할 시간이에요';
-  else if(!arriveDone(day) && ST().arrive.length) say = '출근하면 먼저: '+ST().arrive.filter(a => !day.arrive[a.id]).map(a => a.text).join(' · ');
+  else if(nowMins() < minsOf(ST().start)+30 && ST().arrive.length) say = '출근하면 먼저: '+ST().arrive.map(a => a.text).join(' · ');
   else if(focus) say = '지금은 이것만 생각해요';
   else if(top) say = '1순위부터 시작해 볼까요?';
   else say = '▶ 버튼으로 지금 할 일을 골라요';
@@ -719,14 +726,8 @@ function leftoverHTML(){
 function welcomeHTML(){
   if(S.settingsExists || Object.keys(S.days).length) return '';
   return '<section class="card welcome">'+mascotSvg(84)+'<div><h2>안녕하세요, 뭉게뭉게예요</h2>'+
-    '<p>할 일 하나 끝낼 때마다 저금통에 구름가 하나씩 쌓여요. 1순위 일은 2개, 출근 할 일을 다 하면 1개, 메일·결재를 확인할 때마다 1개예요.</p>'+
+    '<p>할 일 하나 끝낼 때마다 저금통에 구름이 하나씩 쌓여요. 1순위 일은 2개, 메일·결재를 확인할 때마다 1개예요.</p>'+
     '<div class="row"><button class="btn main" data-act="seed">예시 할 일 넣어보기</button><button class="btn" data-act="startBlank">바로 시작하기</button></div></div></section>';
-}
-function arriveHTML(day){
-  const items = ST().arrive; if(!items.length) return '';
-  const done = items.filter(a => day.arrive[a.id]).length;
-  return '<section class="card arrive"><div class="card-head"><h2>출근하면 먼저</h2><span class="count">'+done+' / '+items.length+'</span>'+(done===items.length?'<span class="tag right">다 했어요 · 구름 1개</span>':'')+'</div>'+
-    '<div class="arrive-list">'+items.map(a => '<button class="arrive-item '+(day.arrive[a.id]?'ok':'')+'" data-act="arrive" data-id="'+a.id+'" aria-pressed="'+!!day.arrive[a.id]+'"><span class="box">'+(day.arrive[a.id]?ICON.check:'')+'</span>'+esc(a.text)+'</button>').join('')+'</div></section>';
 }
 function mailHTML(day){
   const slots = mailSlots(); const ok = slots.filter(t => slotOk(day,t)).length;
@@ -738,11 +739,28 @@ function mailHTML(day){
     '<div class="slots">'+slots.map(t => { const ss = slotState(day,t); return '<button class="slot '+ss+'" data-act="slot" data-t="'+t+'" aria-pressed="'+(ss==='ok')+'">'+t+'<small>'+(lab[ss]||'&nbsp;')+'</small></button>'; }).join('')+'</div>'+
     '<div class="alarm-row"><button class="pill '+(on?'on':'')+'" data-act="alarmToggle">'+(on?'알림 끄기':'알림 켜기')+'</button><span>'+alarmTxt+'</span></div></section>';
 }
+function editRowsArrive(){
+  return '<div class="edit-list">'+ST().arrive.map((a,i) => '<div class="erow simple"><input type="text" id="arr-'+a.id+'" data-act="arrName" data-i="'+i+'" value="'+esc(a.text)+'" aria-label="출근 할 일"><button class="ib" data-act="arrDel" data-i="'+i+'" aria-label="지우기">'+ICON.x+'</button></div>').join('')+
+    '<div class="erow simple"><input type="text" id="arr-new" data-enter="arrAdd" placeholder="새로 넣을 일 (Enter)" aria-label="새 출근 할 일"><button class="btn sm" data-act="arrAdd">추가</button></div></div>';
+}
+function editRowsClose(){
+  return '<div class="edit-list">'+ST().close.map((c,i) => '<div class="erow"><input type="time" id="cl-t-'+c.id+'" data-act="clTime" data-i="'+i+'" value="'+esc(c.time||'')+'" aria-label="시간"><input type="text" id="cl-n-'+c.id+'" data-act="clName" data-i="'+i+'" value="'+esc(c.text)+'" aria-label="마감 할 일"><label class="mon-toggle"><input type="checkbox" id="cl-m-'+c.id+'" data-act="clMon" data-i="'+i+'" '+(c.mon?'checked':'')+'>월요일만</label><button class="ib" data-act="clDel" data-i="'+i+'" aria-label="지우기">'+ICON.x+'</button></div>').join('')+
+    '<div class="erow"><input type="time" id="cl-new-t" aria-label="새 마감 할 일 시간"><input type="text" id="cl-new-n" data-enter="clAdd" placeholder="새로 넣을 일 (Enter)" aria-label="새 마감 할 일"><span></span><button class="btn sm" data-act="clAdd">추가</button></div></div>';
+}
+function arriveHTML(day){
+  const items = ST().arrive, editing = S.editArrive;
+  if(!items.length && !editing) return '<section class="card arrive"><div class="card-head"><h2>출근하면 먼저</h2><button class="btn sm right" data-act="editArrive">수정</button></div><p class="sub" style="margin:0">출근하면 할 일을 적어두세요.</p></section>';
+  return '<section class="card arrive"><div class="card-head"><h2>출근하면 먼저</h2><button class="btn sm right '+(editing?'main':'')+'" data-act="editArrive">'+(editing?'완료':'수정')+'</button></div>'+
+    (editing ? editRowsArrive() : '<ol class="arrive-list">'+items.map((a,i) => '<li class="arrive-item"><span class="num">'+(i+1)+'</span>'+esc(a.text)+'</li>').join('')+'</ol>')+'</section>';
+}
 function closingHTML(k){
-  const list = closeState(k); if(!list.length) return '';
+  const list = closeState(k), editing = S.editClose;
   const lab = {now:'지금', past:'', wait:''};
-  return '<section class="card"><h2>마감</h2><p class="sub">퇴근 전에 이 순서대로 해요'+(isMonday(k)?' · 오늘은 월요일':'')+'</p><ul class="closing">'+
-    list.map(x => '<li class="'+x.s+'"><span class="tm '+(x.c.time?'':'mon')+'">'+(x.c.time ? esc(x.c.time) : '월요일')+'</span><span>'+esc(x.c.text)+(x.c.note?' <span class="tag">'+esc(x.c.note)+'</span>':'')+'</span><span class="st">'+lab[x.s]+'</span></li>').join('')+'</ul></section>';
+  return '<section class="card"><div class="card-head" style="margin-bottom:2px"><h2>마감할 때</h2><button class="btn sm right '+(editing?'main':'')+'" data-act="editClose">'+(editing?'완료':'수정')+'</button></div>'+
+    (editing ? '<p class="sub">시간을 비우면 마감 시작할 때 같이 보여줘요. 시간이 있으면 그때 알려줘요.</p>'+editRowsClose()
+      : '<p class="sub">퇴근 전에 이 순서대로 해요'+(isMonday(k)?' · 오늘은 월요일':'')+'</p>'+(list.length ? '<ul class="closing">'+
+        list.map(x => '<li class="'+x.s+'"><span class="tm '+(x.c.time?'':'mon')+'">'+(x.c.time ? esc(x.c.time) : (x.c.mon?'월요일':'—'))+'</span><span>'+esc(x.c.text)+'</span><span class="st">'+lab[x.s]+'</span></li>').join('')+'</ul>' : '<div class="empty">마감할 때 할 일을 적어두세요.</div>'))+
+    '</section>';
 }
 function sortTasks(list){
   return list.slice().sort((a,b) => {
@@ -787,18 +805,18 @@ function renderToday(){
     st.cats.map(c => '<button class="fchip" style="--c:var(--c-'+c.color+')" data-act="filter" data-v="'+c.id+'" aria-pressed="'+(S.filter===c.id)+'"><span class="dot"></span>'+esc(c.name)+(counts[c.id]?'<em>'+counts[c.id]+'</em>':'')+'</button>').join('')+'</div>';
   let list = sortTasks(day.tasks); if(S.filter!=='all') list = list.filter(t => t.cat===S.filter);
   const rows = list.map(t => taskRow(t,k,'today',day.focus)).join('');
-  const arrDone = arriveDone(day);
+  const arrTop = nowMins() < minsOf(st.start)+30 && !day.wrapped;
   return welcomeHTML()+
     '<section class="hero" id="clock">'+clockHTML()+'</section>'+
     '<div id="alerts">'+alertsHTML()+'</div>'+
-    leftoverHTML()+(arrDone || day.wrapped ? '' : arriveHTML(day))+
+    leftoverHTML()+(arrTop ? arriveHTML(day) : '')+
     '<div class="cols"><section class="card"><div class="card-head"><h2>오늘 할 일</h2><span class="count">'+done+' / '+liveT.length+'</span>'+
       (day.wrapped ? '<button class="btn sm right" data-act="unwrap">마무리 다시 열기</button>' : '<button class="btn sm right" data-act="openWrap">오늘 마무리</button>')+'</div>'+
       filt+addFormHTML('today')+
       (rows ? '<ul class="tasks">'+rows+'</ul>' : '<div class="empty">'+(S.filter==='all'?'오늘 할 일이 아직 없어요. 위에 적거나 계획 탭에서 미리 적어둬요.':'이 카테고리에는 할 일이 없어요.')+'</div>')+
     '</section><aside class="side" id="side">'+sideHTML(day)+'</aside></div>';
 }
-function sideHTML(day){ return (arriveDone(day) ? arriveHTML(day) : '')+'<div id="mail-card">'+mailHTML(day)+'</div><div id="close-card">'+closingHTML(day.date)+'</div>'; }
+function sideHTML(day){ const arrTop = nowMins() < minsOf(ST().start)+30 && !day.wrapped; return (arrTop ? '' : arriveHTML(day))+'<div id="mail-card">'+mailHTML(day)+'</div><div id="close-card">'+closingHTML(day.date)+'</div>'; }
 
 function renderPlan(){
   const t = todayKey(); if(!S.planDate) S.planDate = addDays(t,1);
@@ -837,7 +855,6 @@ function weekSummaryText(ws, w){
   const cats = Object.entries(w.catCount).sort((a,b) => b[1]-a[1]);
   if(cats.length) lines.push('· 카테고리별: '+cats.map(c => catOf(c[0]).name+' '+c[1]+'개').join(', '));
   if(w.chkTotal) lines.push('· 샘플실 메일·결재 확인 '+w.chk+'/'+w.chkTotal+'번 ('+Math.round(w.chk/w.chkTotal*100)+'%)');
-  lines.push('· 출근 할 일 다 한 날 '+w.arrive+'일');
   if(w.moved || w.dropped) lines.push('· 다음 날로 넘긴 일 '+w.moved+'개, 보내준 일 '+w.dropped+'개');
   if(w.best && w.best.a) lines.push('· 제일 부지런한 날: '+fmtDate(w.best.k)+' 구름 '+w.best.a+'개');
   const memos = w.days.filter(x => x.day.memo);
@@ -845,9 +862,8 @@ function weekSummaryText(ws, w){
   lines.push('');
   const active = w.days.filter(x => x.active).length;
   let cheer;
-  if(!w.acorns) cheer = '이번 주는 아직 구름가 없어요. 오늘 하나부터 모아봐요!';
+  if(!w.acorns) cheer = '이번 주는 아직 구름이 없어요. 오늘 하나부터 모아봐요!';
   else if(w.chkTotal && w.chk/w.chkTotal < 0.6) cheer = '할 일은 잘 해냈어요. 다음 주엔 30분 메일·결재 확인을 조금 더 챙겨봐요.';
-  else if(w.arrive < active) cheer = '출근 할 일을 빼먹은 날이 있었어요. 앉자마자 출근 문자부터!';
   else cheer = '구름을 가득 모은 한 주였어요. 하늘이 뭉게뭉게!';
   lines.push(cheer);
   return lines.join('\n');
@@ -867,7 +883,7 @@ function renderWeek(){
     '<div class="tiles"><div class="tile"><div class="k">모은 구름</div><div class="v">'+w.acorns+'<small>개</small></div></div>'+
     '<div class="tile"><div class="k">끝낸 일</div><div class="v">'+w.done+'<small>개</small></div></div>'+
     '<div class="tile"><div class="k">메일·결재 확인</div><div class="v">'+w.chk+'<small>/ '+w.chkTotal+'</small></div></div>'+
-    '<div class="tile"><div class="k">출근 할 일 완료</div><div class="v">'+w.arrive+'<small>일</small></div></div></div>'+
+    '<div class="tile"><div class="k">끝낸 1순위</div><div class="v">'+w.topDone+'<small>개</small></div></div></div>'+
     '<div class="grid2"><section class="card"><h2>요일별 구름</h2><p class="sub">막대 아래는 그날 받은 스티커예요</p><div class="wchart">'+cols+'</div></section>'+
     '<section class="card"><h2>어떤 일을 했나</h2><p class="sub">끝낸 일 개수</p><div class="catbars">'+cbars+'</div>'+
       '<div class="section-label">스티커 모음</div><div class="row">'+STICKERS.map(s => '<span class="row" style="gap:4px;font-size:12.5px">'+stickerSvg(s.key,24)+esc(s.name)+' <span class="tag">'+s.min+'개~</span></span>').join('')+'</div></section></div>'+
@@ -883,9 +899,8 @@ function renderSettings(){
   const close = st.close.map((c,i) => '<div class="erow"><input type="time" id="cl-t-'+c.id+'" data-act="clTime" data-i="'+i+'" value="'+esc(c.time||'')+'" aria-label="시간"><input type="text" id="cl-n-'+c.id+'" data-act="clName" data-i="'+i+'" value="'+esc(c.text)+'" aria-label="마감 할 일"><label class="mon-toggle"><input type="checkbox" id="cl-m-'+c.id+'" data-act="clMon" data-i="'+i+'" '+(c.mon?'checked':'')+'>월요일만</label><button class="ib" data-act="clDel" data-i="'+i+'" aria-label="지우기">'+ICON.x+'</button></div>').join('');
   return '<section class="card" style="max-width:660px">'+
     '<div class="field"><span class="lbl">일하는 시간</span><div class="row"><input type="time" id="set-start" data-act="setTime" data-f="start" value="'+esc(st.start)+'"> ~ <input type="time" id="set-end" data-act="setTime" data-f="end" value="'+esc(st.end)+'"> <span class="tag">끝나는 시간 = 퇴근</span></div></div>'+
-    '<div class="field"><span class="lbl">출근하면 먼저 할 일</span><div style="display:grid;gap:6px">'+arrive+'</div><div class="row"><input type="text" id="arr-new" data-enter="arrAdd" placeholder="새 출근 할 일" aria-label="새 출근 할 일"><button class="btn sm" data-act="arrAdd">추가</button></div></div>'+
     '<div class="field"><span class="lbl">샘플실 메일·결재 확인 간격</span><div class="seg" role="group">'+[15,20,30,60].map(m => '<button data-act="mailEvery" data-v="'+m+'" aria-pressed="'+(Number(st.mailEvery)===m)+'">'+m+'분</button>').join('')+'</div><p class="sub" style="margin:0">'+esc(st.start)+'부터 '+esc(st.end)+' 전까지 '+mailSlots().length+'번 알려줘요.</p></div>'+
-    '<div class="field"><span class="lbl">마감 할 일</span><p class="sub" style="margin:0">체크 없이 시간 순서대로 보여주고, 시간이 되면 알려줘요. 시간을 비우면 마감 시작할 때 같이 보여줘요.</p><div style="display:grid;gap:6px">'+close+'</div><div class="row"><button class="btn sm" data-act="clAdd">마감 할 일 추가</button></div></div>'+
+    '<p class="sub">출근하면 먼저 할 일과 마감할 때 할 일은 오늘 화면의 각 카드에서 "수정"을 눌러 바꿀 수 있어요.</p>'+
     '<div class="field"><span class="lbl">못 끝낸 일 기본 처리</span><div class="seg" role="group"><button data-act="leftover" data-v="carry" aria-pressed="'+(st.leftover==='carry')+'">내일로 넘기기</button><button data-act="leftover" data-v="drop" aria-pressed="'+(st.leftover==='drop')+'">보내주기</button></div></div>'+
     '<div class="field"><span class="lbl">카테고리</span><div style="display:grid;gap:8px">'+cats+'</div><div class="row"><input type="text" id="cat-new" data-enter="catAdd" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름"><button class="btn sm" data-act="catAdd">추가</button></div></div>'+
     storageSettingsHTML()+'</section>';
@@ -950,7 +965,7 @@ function tick(){
     const c = document.getElementById('clock'); if(c) c.innerHTML = clockHTML();
     const a = document.getElementById('alerts'); if(a) a.innerHTML = alertsHTML();
     const m = document.getElementById('mail-card'); if(m) m.innerHTML = mailHTML(day);
-    const cl = document.getElementById('close-card'); if(cl) cl.innerHTML = closingHTML(day.date);
+    const cl = document.getElementById('close-card'); if(cl && !S.editClose) cl.innerHTML = closingHTML(day.date);
   }
   updateTitle();
 }
@@ -1004,6 +1019,8 @@ const actions = {
     render();
   },
   filter: el => { S.filter = el.dataset.v; render(); },
+  editArrive: () => { S.editArrive = !S.editArrive; render(true); },
+  editClose: () => { S.editClose = !S.editClose; render(true); },
   arrive: el => {
     const id = el.dataset.id; let completed = false;
     mutateDay(todayKey(), day => { const before = arriveDone(day); day.arrive[id] = !day.arrive[id];
@@ -1070,13 +1087,22 @@ const actions = {
   catAdd: () => { const inp = document.getElementById('cat-new'); const name = inp && inp.value.trim(); if(!name) return;
     mutateSettings(s => { s.cats.push({id:'c'+uid(), name, color:COLORS[s.cats.length % COLORS.length]}); }); },
   arrDel: el => mutateSettings(s => { s.arrive.splice(Number(el.dataset.i),1); }),
-  arrAdd: () => { const inp = document.getElementById('arr-new'); const v = inp && inp.value.trim(); if(!v) return; mutateSettings(s => { s.arrive.push({id:'a'+uid(), text:v}); }); },
+  arrAdd: () => { const inp = document.getElementById('arr-new'); const v = inp && inp.value.trim(); if(!v) return; mutateSettings(s => { s.arrive.push({id:'a'+uid(), text:v}); }); const n2 = document.getElementById('arr-new'); if(n2){ n2.value=''; n2.focus(); } },
   clDel: el => mutateSettings(s => { s.close.splice(Number(el.dataset.i),1); }),
-  clAdd: () => mutateSettings(s => { s.close.push({id:'c'+uid(), time:'', text:'새 마감 할 일'}); }),
+  clAdd: () => { const ti = document.getElementById('cl-new-t'), ni = document.getElementById('cl-new-n'); const text = ni ? ni.value.trim() : '';
+    if(ni && !text){ ni.focus(); return; }
+    mutateSettings(s => { s.close.push({id:'c'+uid(), time: ti ? ti.value : '', text: text || '새 마감 할 일'}); sortClose(s); });
+    const n2 = document.getElementById('cl-new-n'); if(n2){ n2.value=''; n2.focus(); } },
   clMon: el => mutateSettings(s => { const c = s.close[Number(el.dataset.i)]; c.mon = !c.mon; })
 };
 function selectSummary(){ const el = document.getElementById('summary'); const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('선택해뒀어요. 복사해서 쓰세요'); }
-function sortClose(s){ s.close.sort((a,b) => (a.time||'99') < (b.time||'99') ? -1 : 1); }
+function sortClose(s){
+  /* 시간이 없는 일(월요일 퇴근 문자 등)은 바로 앞 일 뒤에 그대로 붙어 있어요 */
+  let last = '00:00';
+  const keyed = s.close.map((c,i) => { const k = c.time ? c.time : last+'~'; if(c.time) last = c.time; return {c, k, i}; });
+  keyed.sort((x,y) => x.k < y.k ? -1 : x.k > y.k ? 1 : x.i - y.i);
+  s.close = keyed.map(x => x.c);
+}
 
 document.addEventListener('click', e => {
   if(alarm.wanted()) alarm.unlock();
