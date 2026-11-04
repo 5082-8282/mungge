@@ -57,9 +57,17 @@ function summarize(docs) {
 }
 
 /* ---------- 그리기 ---------- */
+/* 둥근 글씨체가 없으면 기본 글씨체로 */
+function mkFont(weight, size) {
+  const names = weight === "bold" ? ["boldRoundedSystemFont", "boldSystemFont"]
+    : weight === "semi" ? ["semiboldRoundedSystemFont", "semiboldSystemFont", "boldSystemFont"]
+    : ["regularRoundedSystemFont", "regularSystemFont", "systemFont"];
+  for (const n of names) if (typeof Font[n] === "function") return Font[n](size);
+  return Font.systemFont(size);
+}
 function txt(stack, s, size, color, weight, lines) {
   const t = stack.addText(String(s));
-  t.font = weight === "bold" ? Font.boldRoundedSystemFont(size) : weight === "semi" ? Font.semiboldRoundedSystemFont(size) : Font.roundedSystemFont(size);
+  t.font = mkFont(weight, size);
   t.textColor = color;
   t.lineLimit = lines || 1;
   t.minimumScaleFactor = 0.7;
@@ -134,7 +142,7 @@ function countdown(stack, s, size, stacked) {
   else { txt(row, "오늘 끝! 수고했어요", size - 2, C.accent, "bold"); return; }
   const d = row.addDate(now < startD ? startD : endD);
   d.applyTimerStyle();
-  d.font = Font.boldRoundedSystemFont(size);
+  d.font = mkFont("bold", size);
   d.textColor = C.accent;
   d.lineLimit = 1;
   d.minimumScaleFactor = 0.7;
