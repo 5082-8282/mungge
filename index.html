@@ -196,6 +196,15 @@ h3{font-size:15px}
 .pri.p1{color:var(--accent-ink);border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-soft)}
 .tag{font-size:12px;color:var(--muted)}
 .topbadge{font-size:12px;font-weight:500;color:var(--accent-ink)}
+.rank{font-size:11.5px;font-weight:700;padding:0 7px;border-radius:6px;line-height:1.6}
+.rank.r1{background:var(--accent);color:#fff}
+.rank.r2{background:color-mix(in srgb,var(--accent) 22%,var(--card));color:var(--accent-ink)}
+.rank.r3{background:var(--accent-soft);color:var(--accent-ink)}
+.rankpick{display:flex;gap:4px;align-items:center}
+.rankpick button{min-width:30px;height:30px;border-radius:9px;border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--card);color:var(--accent-ink);font-weight:700;font-size:13px;padding:0 6px}
+.rankpick button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.rankpick button.none{color:var(--muted);border-color:var(--line);font-weight:500;font-size:12px}
+.task.picking .t-acts{opacity:1!important}
 .t-acts{display:flex;gap:2px}
 .ib{width:32px;height:32px;border-radius:9px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;padding:0}
 .ib:hover{background:var(--soft);color:var(--ink)}
@@ -670,6 +679,7 @@ function blankDay(k){ return {date:k, tasks:[], arrive:{}, checks:{}, focus:null
 function getDay(k){ const d = S.days[k]; if(!d) return blankDay(k);
   return Object.assign(blankDay(k), d, {arrive:d.arrive||{}, checks:d.checks||{}, tasks:d.tasks||[]}); }
 const live = t => !t.moved && !t.dropped;
+const rankOf = t => t.rank || (t.top ? 1 : 0);
 function mailSlots(){
   const st = ST(), out = [], step = Math.max(10, Number(st.mailEvery)||30);
   for(let m = minsOf(st.start); m < minsOf(st.end); m += step) out.push(hhmm(m));
@@ -936,7 +946,7 @@ function clockHTML(){
       return '<span class="tick '+(ss==='ok'?'ok':ss==='late'?'late':'')+'" style="left:'+p+'%">'+(minsOf(t)%60===0?'<span>'+t.slice(0,2)+'시</span>':'')+'</span>'; }).join('')+
     closingToday(k).filter(c => c.time && c.text!=='퇴근').slice(0,1).map(c => '<span class="tick close" style="left:'+clamp((minsOf(c.time)-s)/(e-s),0,1)*100+'%"><span style="top:15px">마감</span></span>').join('');
   const focus = day.tasks.find(t => t.id===day.focus && !t.done && live(t));
-  const top = day.tasks.find(t => t.top && !t.done && live(t));
+  const top = day.tasks.filter(t => rankOf(t) && !t.done && live(t)).sort((a,b) => rankOf(a)-rankOf(b))[0];
   const od = overdueSlot(day), cs = closeState(k).find(x => x.s==='now' && x.c.time);
   let say;
   if(ph==='after') say = day.wrapped ? '오늘도 수고했어요!' : '오늘 끝! 마무리하고 구름 세어봐요';
@@ -944,11 +954,11 @@ function clockHTML(){
   else if(od) say = od+' 메일·결재 확인할 시간이에요';
   else if(nowMins() < minsOf(ST().start)+30 && ST().arrive.length) say = '출근하면 먼저: '+ST().arrive.map(a => a.text).join(' · ');
   else if(focus) say = '지금은 이것만 생각해요';
-  else if(top) say = '1순위부터 시작해 볼까요?';
+  else if(top) say = rankOf(top)+'순위부터 시작해 볼까요?';
   else say = '▶ 버튼으로 지금 할 일을 골라요';
   const fl = focus
     ? '<span class="lbl">지금 하는 일</span><b>'+esc(focus.text)+'</b><button class="btn sm" data-act="toggle" data-k="'+k+'" data-id="'+focus.id+'">다 했어요</button>'
-    : (top ? '<span class="lbl">오늘의 1순위</span><b>'+esc(top.text)+'</b><button class="btn sm" data-act="focus" data-k="'+k+'" data-id="'+top.id+'">지금 시작</button>' : '<span class="lbl">아래 할 일에서 ★로 1순위를 골라요</span>');
+    : (top ? '<span class="lbl">오늘의 '+rankOf(top)+'순위</span><b>'+esc(top.text)+'</b><button class="btn sm" data-act="focus" data-k="'+k+'" data-id="'+top.id+'">지금 시작</button>' : '<span class="lbl">아래 할 일에서 ★를 눌러 1·2·3순위를 정해요</span>');
   return '<div style="min-width:0"><div class="bubble">'+cloudSvg(18,'accent')+'<span>'+esc(say)+'</span></div>'+
     '<div class="clock-label">'+label+'</div><div class="clock-big">'+big+'</div>'+
     '<div class="track" aria-hidden="true"><div class="fill" style="width:'+pct+'%"></div>'+ticks+'<span class="me" style="left:'+pct+'%">'+cloudSvg(30)+'</span></div>'+
@@ -991,7 +1001,7 @@ function leftoverHTML(){
 function welcomeHTML(){
   if(S.settingsExists || Object.keys(S.days).length) return '';
   return '<section class="card welcome">'+mascotSvg(84)+'<div><h2>안녕하세요, 뭉게뭉게예요</h2>'+
-    '<p>할 일 하나 끝낼 때마다 저금통에 구름이 하나씩 쌓여요. 1순위 일은 2개, 메일·결재를 확인할 때마다 1개예요.</p>'+
+    '<p>할 일 하나 끝낼 때마다 저금통에 구름이 하나씩 쌓여요. 1순위 일은 2개, 메일·결재를 확인할 때마다 1개예요. 할 일 옆 ★로 1·2·3순위를 정할 수 있어요.</p>'+
     '<div class="row"><button class="btn main" data-act="seed">예시 할 일 넣어보기</button><button class="btn" data-act="startBlank">바로 시작하기</button></div></div></section>';
 }
 function mailHTML(day){
@@ -1029,8 +1039,9 @@ function closingHTML(k){
 }
 function sortTasks(list){
   return list.slice().sort((a,b) => {
-    const ra = (a.moved||a.dropped)?3:a.done?2:a.top?0:1, rb = (b.moved||b.dropped)?3:b.done?2:b.top?0:1;
-    if(ra!==rb) return ra-rb; if(a.pri!==b.pri) return a.pri-b.pri; return (a.c||0)-(b.c||0);
+    const ra = (a.moved||a.dropped)?3:a.done?2:rankOf(a)?0:1, rb = (b.moved||b.dropped)?3:b.done?2:rankOf(b)?0:1;
+    if(ra!==rb) return ra-rb;
+    if(ra===0 && rankOf(a)!==rankOf(b)) return rankOf(a)-rankOf(b); if(a.pri!==b.pri) return a.pri-b.pri; return (a.c||0)-(b.c||0);
   });
 }
 function taskRow(t, k, ctx, focusId){
@@ -1038,20 +1049,21 @@ function taskRow(t, k, ctx, focusId){
   let acts = '';
   if(!state){
     if(ctx==='today' && !t.done) acts += '<button class="ib" data-act="focus" data-k="'+k+'" data-id="'+t.id+'" title="지금 이거 하기" aria-label="지금 이거 하기">'+ICON.play+'</button>';
-    acts += '<button class="ib '+(t.top?'on':'')+'" data-act="star" data-k="'+k+'" data-id="'+t.id+'" title="1순위로 정하기" aria-label="1순위로 정하기">'+ICON.star+'</button>';
+    acts += '<button class="ib '+(rankOf(t)?'on':'')+'" data-act="rankPick" data-k="'+k+'" data-id="'+t.id+'" title="순위 정하기" aria-label="순위 정하기">'+ICON.star+'</button>';
     if(!t.done) acts += '<button class="ib" data-act="toNext" data-k="'+k+'" data-id="'+t.id+'" title="다음 날로 미루기" aria-label="다음 날로 미루기">'+ICON.next+'</button>';
     acts += '<button class="ib" data-act="del" data-k="'+k+'" data-id="'+t.id+'" title="지우기" aria-label="지우기">'+ICON.x+'</button>';
+    if(S.rankPick===t.id) acts = '<div class="rankpick" role="group" aria-label="순위 고르기">'+[1,2,3].map(r => '<button data-act="setRank" data-k="'+k+'" data-id="'+t.id+'" data-r="'+r+'" aria-pressed="'+(rankOf(t)===r)+'">'+r+'</button>').join('')+'<button data-act="setRank" data-k="'+k+'" data-id="'+t.id+'" data-r="0" class="none">없음</button></div>';
   } else acts = '<button class="ib" data-act="restore" data-k="'+k+'" data-id="'+t.id+'" title="되돌리기" aria-label="되돌리기">'+ICON.undo+'</button>';
   const meta = '<span class="chip">'+esc(cat.name)+'</span>'+
     (state ? '' : '<button class="pri p'+t.pri+'" data-act="cyclePri" data-k="'+k+'" data-id="'+t.id+'" title="눌러서 중요도 바꾸기">'+PRI[t.pri]+'</button>')+
-    (t.top ? '<span class="topbadge">★ 1순위 · 구름 2개</span>' : '')+
+    (rankOf(t) ? '<span class="rank r'+rankOf(t)+'">'+rankOf(t)+'순위</span>'+(rankOf(t)===1?'<span class="topbadge">구름 2개</span>':'') : '')+
     (t.from ? '<span class="tag">'+shortDate(t.from)+'에서 넘어옴</span>' : '')+
     (t.ex ? '<span class="tag">예시</span>' : '')+
     (t.moved ? '<span class="tag">'+shortDate(t.moved)+'로 넘김</span>' : '')+
     (t.dropped ? '<span class="tag">보내줌</span>' : '');
   const tick = state ? '<span class="tk"><span class="ring" style="opacity:.4"></span></span>'
     : '<button class="tk" data-act="toggle" data-k="'+k+'" data-id="'+t.id+'" aria-label="'+(t.done?'완료 취소':'완료')+'">'+(t.done?cloudSvg(26,'accent'):'<span class="ring"></span>')+'</button>';
-  return '<li class="task '+(t.done?'done ':'')+(t.top&&!t.done&&focusId!==t.id?'is-top ':'')+(focusId===t.id&&!t.done?'now ':'')+state+'" style="--c:var(--c-'+cat.color+')">'+tick+
+  return '<li class="task '+(t.done?'done ':'')+(rankOf(t)===1&&!t.done&&focusId!==t.id?'is-top ':'')+(focusId===t.id&&!t.done?'now ':'')+(S.rankPick===t.id?'picking ':'')+state+'" style="--c:var(--c-'+cat.color+')">'+tick+
     '<div><div class="t-text">'+esc(t.text)+'</div><div class="t-meta">'+meta+'</div></div><div class="t-acts">'+acts+'</div></li>';
 }
 function addFormHTML(ctx){
@@ -1089,12 +1101,12 @@ function renderPlan(){
   const diff = Math.round((parseKey(k)-parseKey(t))/86400000);
   const rel = diff===0?'오늘':diff===1?'내일':diff===2?'모레':diff<0?(-diff)+'일 전':diff+'일 뒤';
   const rows = sortTasks(day.tasks).map(x => taskRow(x,k,'plan',null)).join('');
-  const liveT = day.tasks.filter(live), hasTop = liveT.some(x => x.top);
+  const liveT = day.tasks.filter(live), hasTop = liveT.some(x => rankOf(x)===1);
   const byCat = ST().cats.map(c => [c, liveT.filter(x => x.cat===c.id).length]).filter(x => x[1]);
   return '<section class="card"><div class="plan-nav"><button class="btn" data-act="planMove" data-v="-1" aria-label="이전 날">‹</button><div class="mid"><h2>'+fmtDate(k)+'</h2><div class="rel">'+rel+(isMonday(k)?' · 월요일: 일주일치 퇴근 문자 예약하는 날':'')+'</div></div><button class="btn" data-act="planMove" data-v="1" aria-label="다음 날">›</button></div>'+
-    '<p class="sub" style="text-align:center">퇴근 전에 내일 할 일을 적고 ★로 1순위 하나를 골라두면, 출근하자마자 그것부터 시작해요.</p>'+
+    '<p class="sub" style="text-align:center">퇴근 전에 내일 할 일을 적고 ★를 눌러 1·2·3순위를 정해두면, 출근하자마자 1순위부터 시작해요.</p>'+
     addFormHTML('plan')+
-    (liveT.length && !hasTop ? '<div class="banner calm" style="margin-bottom:10px"><div class="msg"><b>1순위를 골라주세요</b>★를 누르면 그날의 1순위가 돼요. 끝내면 구름 2개!</div></div>' : '')+
+    (liveT.length && !hasTop ? '<div class="banner calm" style="margin-bottom:10px"><div class="msg"><b>순위를 정해주세요</b>★를 누르고 1, 2, 3 중에 골라요. 1순위를 끝내면 구름 2개!</div></div>' : '')+
     (rows ? '<ul class="tasks">'+rows+'</ul>' : '<div class="empty">이날 할 일이 아직 없어요.</div>')+
     (byCat.length ? '<div class="filters" style="margin-top:12px">'+byCat.map(x => '<span class="fchip" style="--c:var(--c-'+x[0].color+')"><span class="dot"></span>'+esc(x[0].name)+' <em>'+x[1]+'</em></span>').join('')+'</div>' : '')+
     '</section>';
@@ -1270,12 +1282,30 @@ const actions = {
     if(gained) toast(wasTop ? '1순위 해치움! 구름 2개' : CHEERS[Math.floor(Math.random()*CHEERS.length)]);
   },
   focus: el => mutateDay(el.dataset.k, day => { day.focus = day.focus===el.dataset.id ? null : el.dataset.id; }),
-  star: el => mutateDay(el.dataset.k, day => { const t = findTask(day, el.dataset.id); if(!t) return; const on = !t.top; day.tasks.forEach(x => x.top = false); t.top = on; }),
+  rankPick: el => { S.rankPick = S.rankPick===el.dataset.id ? null : el.dataset.id; render(); },
+  setRank: el => {
+    const r = Number(el.dataset.r); S.rankPick = null;
+    mutateDay(el.dataset.k, day => {
+      const t = findTask(day, el.dataset.id); if(!t) return;
+      const before = rankOf(t);
+      const others = day.tasks.filter(x => x!==t && live(x) && !x.done && rankOf(x));
+      const setR = (x, v) => { if(v>=1 && v<=3) x.rank = v; else delete x.rank; x.top = v===1; };
+      if(r && before){ /* 순위가 있던 일끼리는 자리를 바꿔요 */
+        others.forEach(x => { if(rankOf(x)===r) setR(x, before); });
+      } else if(r){ /* 새로 끼워 넣으면 그 아래 순위가 하나씩 밀려요 */
+        others.filter(x => rankOf(x)>=r).forEach(x => setR(x, rankOf(x)+1));
+      } else if(before){ /* 순위를 빼면 아래 순위가 하나씩 올라와요 */
+        others.filter(x => rankOf(x)>before).forEach(x => setR(x, rankOf(x)-1));
+      }
+      if(r){ t.rank = r; } else delete t.rank;
+      t.top = r===1;
+    });
+  },
   cyclePri: el => mutateDay(el.dataset.k, day => { const t = findTask(day, el.dataset.id); if(t) t.pri = t.pri>=3 ? 1 : t.pri+1; }),
   del: el => mutateDay(el.dataset.k, day => { day.tasks = day.tasks.filter(t => t.id!==el.dataset.id); if(day.focus===el.dataset.id) day.focus = null; }),
   toNext: el => {
     const k = el.dataset.k, nk = addDays(k,1); let copy = null;
-    mutateDay(k, day => { const t = findTask(day, el.dataset.id); if(!t) return; t.moved = nk; t.top = false; if(day.focus===t.id) day.focus = null;
+    mutateDay(k, day => { const t = findTask(day, el.dataset.id); if(!t) return; t.moved = nk; t.top = false; delete t.rank; if(day.focus===t.id) day.focus = null;
       copy = {id:uid(), text:t.text, cat:t.cat, pri:t.pri, top:false, done:false, from:k, c:Date.now()}; }, true);
     if(copy) mutateDay(nk, day => { day.tasks.push(copy); }, true);
     render(); toast(shortDate(nk)+'로 넘겼어요');
@@ -1312,8 +1342,8 @@ const actions = {
     const k = todayKey(), now = Date.now();
     mutateSettings(() => {});
     mutateDay(k, day => { day.tasks.push(
-      {id:uid(), text:'샘플실 대여 일정 정리하기', cat:'sample', pri:1, top:true, done:false, ex:true, c:now},
-      {id:uid(), text:'컨설팅 학생 피드백 메모 쓰기', cat:'consult', pri:2, top:false, done:false, ex:true, c:now+1},
+      {id:uid(), text:'샘플실 대여 일정 정리하기', cat:'sample', pri:1, top:true, rank:1, done:false, ex:true, c:now},
+      {id:uid(), text:'컨설팅 학생 피드백 메모 쓰기', cat:'consult', pri:2, top:false, rank:2, done:false, ex:true, c:now+1},
       {id:uid(), text:'동아리 다음 모임 공지 올리기', cat:'club', pri:2, top:false, done:false, ex:true, c:now+2},
       {id:uid(), text:'영어 아티클 하나 읽기', cat:'self', pri:3, top:false, done:false, ex:true, c:now+3}); });
   },
