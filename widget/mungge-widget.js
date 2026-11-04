@@ -54,7 +54,8 @@ function summarize(docs) {
   const catName = id => { const c = (st.cats || []).find(x => x.id === id); return c && c.name ? String(c.name).replace(/ ?업무$/, "") : "기타"; };
   const focus = tasks.find(t => t.id === day.focus && !t.done);
   const topT = tasks.find(t => t.top);
-  return { st, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
+  const closed = !!day.closedAt || !!(st.autoShutter && !day.reopened && nowM >= mins(st.autoShutter));
+  return { st, closed, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
 }
 
 /* ---------- 그리기 ---------- */
@@ -185,6 +186,7 @@ function listBox(parent, s, opt) {
 }
 
 function build(s) {
+  if (s.closed) return shutterWidget(s);
   const w = new ListWidget();
   const g = new LinearGradient();
   g.colors = [C.bgTop, C.bgBottom];
@@ -236,9 +238,99 @@ function build(s) {
     }
   }
   /* 출근·퇴근 시간과 15분마다 다시 그려요 (아이폰이 정확한 시간은 조절해요) */
-  const marks = [at(s.st.start), at(s.st.end)].filter(d => d > now).sort((a, b) => a - b);
+  const marks = [at(s.st.start), at(s.st.end)].concat(s.st.autoShutter ? [at(s.st.autoShutter)] : []).filter(d => d > now).sort((a, b) => a - b);
   const soon = new Date(Date.now() + 15 * 60 * 1000);
   w.refreshAfterDate = marks[0] && marks[0] < soon ? marks[0] : soon;
+  return w;
+}
+
+/* ---------- 퇴근 셔터 ---------- */
+function shutterImage(W, H, dark) {
+  const dc = new DrawContext();
+  dc.size = new Size(W, H); dc.opaque = true; dc.respectScreenScale = true;
+  const c = dark ? { bg: "#1B2B3B", slat: "#22374B", line: "#2E4760", handle: "#4F6E8A" }
+                 : { bg: "#E4EFF8", slat: "#EDF4FA", line: "#C9DCEC", handle: "#9BB6CC" };
+  dc.setFillColor(new Color(c.bg)); dc.fillRect(new Rect(0, 0, W, H));
+  const top = 30;
+  for (let y = top; y < H; y += 14) {
+    dc.setFillColor(new Color(c.slat)); dc.fillRect(new Rect(0, y, W, 11));
+    dc.setFillColor(new Color(c.line)); dc.fillRect(new Rect(0, y + 11, W, 1.5));
+  }
+  dc.setFillColor(new Color("#3D8FD1")); dc.fillRect(new Rect(0, 0, W, top));
+  dc.setFillColor(new Color("#FFFFFF", 0.35)); dc.fillRect(new Rect(0, top, W, 3));
+  const hp = new Path(); hp.addRoundedRect(new Rect(W / 2 - 20, H - 12, 40, 5), 2.5, 2.5);
+  dc.addPath(hp); dc.setFillColor(new Color(c.handle)); dc.fillPath();
+  return dc.getImage();
+}
+function sleepyImage() {
+  const W = 120, H = 90, dc = new DrawContext();
+  dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
+  const P = (x, y) => new Point(x, y);
+  const blob = (dx, dy, fill) => {
+    dc.setFillColor(new Color(fill));
+    [[7.5, 14.5, 3.6], [12, 11, 5], [16.8, 13.8, 4.2]].forEach(([cx, cy, r]) => dc.fillEllipse(new Rect(-6 + (cx - r) * 5.5 + dx, -18 + (cy - r) * 5.5 + dy, r * 11, r * 11)));
+    dc.fillRect(new Rect(-6 + 7.5 * 5.5 + dx, -18 + 13 * 5.5 + dy, 9.3 * 5.5, 5.1 * 5.5));
+  };
+  blob(0, 2.5, "#8CBDE6"); blob(0, 0, "#FFFFFF");
+  const eye = x => { const p = new Path(); p.move(P(x, 61)); p.addQuadCurve(P(x + 10, 61), P(x + 5, 65)); dc.addPath(p); };
+  dc.setStrokeColor(new Color("#1E2E3D")); dc.setLineWidth(2.4);
+  eye(45); dc.strokePath(); eye(67); dc.strokePath();
+  const m = new Path(); m.move(P(57, 68)); m.addQuadCurve(P(65, 68), P(61, 70)); dc.addPath(m); dc.setLineWidth(2); dc.strokePath();
+  dc.setFillColor(new Color("#F7B9C8"));
+  dc.fillEllipse(new Rect(37, 64, 10, 6)); dc.fillEllipse(new Rect(75, 64, 10, 6));
+  dc.setTextColor(new Color("#3D8FD1"));
+  dc.setFont(mkFont("bold", 13)); dc.drawText("z", P(92, 8));
+  dc.setFont(mkFont("bold", 10)); dc.drawText("z", P(103, 0));
+  return dc.getImage();
+}
+function shutterWidget(s) {
+  const fam = config.widgetFamily || "medium";
+  const dark = Device.isUsingDarkAppearance();
+  const size = fam === "small" ? [158, 158] : fam === "large" ? [338, 354] : [338, 158];
+  const w = new ListWidget();
+  w.backgroundImage = shutterImage(size[0], size[1], dark);
+  w.url = APP_URL;
+  w.setPadding(8, 16, 12, 16);
+  const head = w.addStack(); head.centerAlignContent();
+  icon(head, "cloud.fill", 10, new Color("#FFFFFF"));
+  head.addSpacer(4);
+  txt(head, "뭉게뭉게", 10, new Color("#FFFFFF"), "bold");
+  head.addSpacer();
+  w.addSpacer();
+  const signBg = dark ? new Color("#1F3348") : new Color("#FFFFFF");
+  const signInk = dark ? new Color("#8DC4F0") : new Color("#2A6FA8");
+  const lt = s.total, sub = `구름 ${s.clouds}개 · 끝낸 일 ${s.done}/${lt}`;
+  const sign = (parent, big) => {
+    const b = parent.addStack(); b.layoutVertically();
+    b.backgroundColor = signBg; b.cornerRadius = 12; b.setPadding(8, 12, 8, 12);
+    txt(b, fam === "small" ? "오늘 셔터\n내립니다!" : "오늘 셔터 내립니다!", big, signInk, "bold", 2);
+    b.addSpacer(2);
+    txt(b, sub, 9.5, C.muted, "semi");
+    return b;
+  };
+  if (fam === "small") {
+    const r = w.addStack(); r.addSpacer();
+    const img = r.addImage(sleepyImage()); img.imageSize = new Size(60, 45);
+    r.addSpacer();
+    w.addSpacer(4);
+    const r2 = w.addStack(); r2.addSpacer(); sign(r2, 13); r2.addSpacer();
+  } else {
+    const r = w.addStack(); r.centerAlignContent(); r.addSpacer();
+    const img = r.addImage(sleepyImage()); img.imageSize = new Size(fam === "large" ? 120 : 84, fam === "large" ? 90 : 63);
+    r.addSpacer(12);
+    sign(r, fam === "large" ? 18 : 15);
+    r.addSpacer();
+    if (fam === "large") {
+      w.addSpacer(14);
+      const t = w.addStack(); t.addSpacer();
+      txt(t, `내일 ${s.st.start}에 다시 열어요`, 11, C.muted, "semi");
+      t.addSpacer();
+    }
+  }
+  w.addSpacer();
+  /* 다음 날 출근 시간에 셔터가 올라가요 */
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 5, 0, 0);
+  w.refreshAfterDate = tomorrow;
   return w;
 }
 

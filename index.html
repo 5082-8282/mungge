@@ -301,6 +301,30 @@ h3{font-size:15px}
 .welcome{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;margin-bottom:12px}
 .welcome p{margin:4px 0 10px;font-size:14px}
 @media (max-width:560px){.welcome{grid-template-columns:1fr}.welcome svg{display:none}}
+/* 퇴근 셔터 */
+.hero{position:relative}
+.gohome{display:inline-flex;align-items:center;gap:5px;margin-left:auto}
+.shutter{grid-column:1/-1;margin:-20px -24px;min-height:220px;position:relative;border-radius:var(--r);overflow:hidden;
+  background:repeating-linear-gradient(180deg,#EDF4FA 0 11px,#C9DCEC 11px 12.5px,#E4EFF8 12.5px 14px);
+  display:grid;place-items:center;padding:44px 20px 30px;animation:shutterDown .9s cubic-bezier(.3,1.25,.5,1) both}
+:root[data-theme="dark"] .shutter{background:repeating-linear-gradient(180deg,#22374B 0 11px,#2E4760 11px 12.5px,#1B2B3B 12.5px 14px)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .shutter{background:repeating-linear-gradient(180deg,#22374B 0 11px,#2E4760 11px 12.5px,#1B2B3B 12.5px 14px)}}
+.shutter .housing{position:absolute;left:0;right:0;top:0;height:30px;background:var(--accent);display:flex;align-items:center;padding:0 16px;color:#fff;font-weight:700;font-size:13px;box-shadow:0 3px 0 rgba(255,255,255,.35)}
+.shutter .housing span{display:flex;align-items:center;gap:6px}
+.shutter .sh-body{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center}
+.shutter .sign{background:var(--card);border-radius:14px;padding:12px 18px;display:grid;gap:2px;box-shadow:0 4px 14px rgba(30,60,90,.12);transform:rotate(-2deg);position:relative}
+.shutter .sign::before,.shutter .sign::after{content:"";position:absolute;top:-16px;width:2px;height:16px;background:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.shutter .sign::before{left:24px}.shutter .sign::after{right:24px}
+.shutter .sign b{font-family:var(--display);font-weight:400;font-size:24px;color:var(--accent-ink)}
+.shutter .sign span{font-size:13px;color:var(--muted)}
+.shutter .sign .tm{font-size:12px}
+.shutter .sh-open{position:absolute;right:14px;bottom:12px;background:color-mix(in srgb,var(--card) 85%,transparent)}
+.shutter .handle{position:absolute;left:50%;bottom:8px;width:44px;height:6px;margin-left:-22px;border-radius:3px;background:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.sleepy{animation:bob 3.2s ease-in-out infinite}
+.sleepy .z1{animation:zz 2.4s ease-in-out infinite}.sleepy .z2{animation:zz 2.4s ease-in-out .6s infinite}
+@keyframes zz{0%,100%{opacity:.2}50%{opacity:1}}
+@keyframes shutterDown{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+@media (max-width:560px){.shutter{margin:-16px;padding:44px 14px 68px}.shutter .sign b{font-size:20px}.shutter .sh-open{right:50%;transform:translateX(50%);bottom:18px}.shutter .handle{display:none}}
 /* 로딩: 구름이 둥실 떠오르고 이름이 한 글자씩 */
 #splash{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:linear-gradient(180deg,var(--sky-top),var(--sky-bottom));transition:opacity .55s ease,visibility .55s;overflow:hidden}
 #splash.hide{opacity:0;visibility:hidden}
@@ -394,7 +418,8 @@ function summarize(docs) {
   const catName = id => { const c = (st.cats || []).find(x => x.id === id); return c && c.name ? String(c.name).replace(/ ?업무$/, "") : "기타"; };
   const focus = tasks.find(t => t.id === day.focus && !t.done);
   const topT = tasks.find(t => t.top);
-  return { st, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
+  const closed = !!day.closedAt || !!(st.autoShutter && !day.reopened && nowM >= mins(st.autoShutter));
+  return { st, closed, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
 }
 
 /* ---------- 그리기 ---------- */
@@ -525,6 +550,7 @@ function listBox(parent, s, opt) {
 }
 
 function build(s) {
+  if (s.closed) return shutterWidget(s);
   const w = new ListWidget();
   const g = new LinearGradient();
   g.colors = [C.bgTop, C.bgBottom];
@@ -576,9 +602,99 @@ function build(s) {
     }
   }
   /* 출근·퇴근 시간과 15분마다 다시 그려요 (아이폰이 정확한 시간은 조절해요) */
-  const marks = [at(s.st.start), at(s.st.end)].filter(d => d > now).sort((a, b) => a - b);
+  const marks = [at(s.st.start), at(s.st.end)].concat(s.st.autoShutter ? [at(s.st.autoShutter)] : []).filter(d => d > now).sort((a, b) => a - b);
   const soon = new Date(Date.now() + 15 * 60 * 1000);
   w.refreshAfterDate = marks[0] && marks[0] < soon ? marks[0] : soon;
+  return w;
+}
+
+/* ---------- 퇴근 셔터 ---------- */
+function shutterImage(W, H, dark) {
+  const dc = new DrawContext();
+  dc.size = new Size(W, H); dc.opaque = true; dc.respectScreenScale = true;
+  const c = dark ? { bg: "#1B2B3B", slat: "#22374B", line: "#2E4760", handle: "#4F6E8A" }
+                 : { bg: "#E4EFF8", slat: "#EDF4FA", line: "#C9DCEC", handle: "#9BB6CC" };
+  dc.setFillColor(new Color(c.bg)); dc.fillRect(new Rect(0, 0, W, H));
+  const top = 30;
+  for (let y = top; y < H; y += 14) {
+    dc.setFillColor(new Color(c.slat)); dc.fillRect(new Rect(0, y, W, 11));
+    dc.setFillColor(new Color(c.line)); dc.fillRect(new Rect(0, y + 11, W, 1.5));
+  }
+  dc.setFillColor(new Color("#3D8FD1")); dc.fillRect(new Rect(0, 0, W, top));
+  dc.setFillColor(new Color("#FFFFFF", 0.35)); dc.fillRect(new Rect(0, top, W, 3));
+  const hp = new Path(); hp.addRoundedRect(new Rect(W / 2 - 20, H - 12, 40, 5), 2.5, 2.5);
+  dc.addPath(hp); dc.setFillColor(new Color(c.handle)); dc.fillPath();
+  return dc.getImage();
+}
+function sleepyImage() {
+  const W = 120, H = 90, dc = new DrawContext();
+  dc.size = new Size(W, H); dc.opaque = false; dc.respectScreenScale = true;
+  const P = (x, y) => new Point(x, y);
+  const blob = (dx, dy, fill) => {
+    dc.setFillColor(new Color(fill));
+    [[7.5, 14.5, 3.6], [12, 11, 5], [16.8, 13.8, 4.2]].forEach(([cx, cy, r]) => dc.fillEllipse(new Rect(-6 + (cx - r) * 5.5 + dx, -18 + (cy - r) * 5.5 + dy, r * 11, r * 11)));
+    dc.fillRect(new Rect(-6 + 7.5 * 5.5 + dx, -18 + 13 * 5.5 + dy, 9.3 * 5.5, 5.1 * 5.5));
+  };
+  blob(0, 2.5, "#8CBDE6"); blob(0, 0, "#FFFFFF");
+  const eye = x => { const p = new Path(); p.move(P(x, 61)); p.addQuadCurve(P(x + 10, 61), P(x + 5, 65)); dc.addPath(p); };
+  dc.setStrokeColor(new Color("#1E2E3D")); dc.setLineWidth(2.4);
+  eye(45); dc.strokePath(); eye(67); dc.strokePath();
+  const m = new Path(); m.move(P(57, 68)); m.addQuadCurve(P(65, 68), P(61, 70)); dc.addPath(m); dc.setLineWidth(2); dc.strokePath();
+  dc.setFillColor(new Color("#F7B9C8"));
+  dc.fillEllipse(new Rect(37, 64, 10, 6)); dc.fillEllipse(new Rect(75, 64, 10, 6));
+  dc.setTextColor(new Color("#3D8FD1"));
+  dc.setFont(mkFont("bold", 13)); dc.drawText("z", P(92, 8));
+  dc.setFont(mkFont("bold", 10)); dc.drawText("z", P(103, 0));
+  return dc.getImage();
+}
+function shutterWidget(s) {
+  const fam = config.widgetFamily || "medium";
+  const dark = Device.isUsingDarkAppearance();
+  const size = fam === "small" ? [158, 158] : fam === "large" ? [338, 354] : [338, 158];
+  const w = new ListWidget();
+  w.backgroundImage = shutterImage(size[0], size[1], dark);
+  w.url = APP_URL;
+  w.setPadding(8, 16, 12, 16);
+  const head = w.addStack(); head.centerAlignContent();
+  icon(head, "cloud.fill", 10, new Color("#FFFFFF"));
+  head.addSpacer(4);
+  txt(head, "뭉게뭉게", 10, new Color("#FFFFFF"), "bold");
+  head.addSpacer();
+  w.addSpacer();
+  const signBg = dark ? new Color("#1F3348") : new Color("#FFFFFF");
+  const signInk = dark ? new Color("#8DC4F0") : new Color("#2A6FA8");
+  const lt = s.total, sub = `구름 ${s.clouds}개 · 끝낸 일 ${s.done}/${lt}`;
+  const sign = (parent, big) => {
+    const b = parent.addStack(); b.layoutVertically();
+    b.backgroundColor = signBg; b.cornerRadius = 12; b.setPadding(8, 12, 8, 12);
+    txt(b, fam === "small" ? "오늘 셔터\n내립니다!" : "오늘 셔터 내립니다!", big, signInk, "bold", 2);
+    b.addSpacer(2);
+    txt(b, sub, 9.5, C.muted, "semi");
+    return b;
+  };
+  if (fam === "small") {
+    const r = w.addStack(); r.addSpacer();
+    const img = r.addImage(sleepyImage()); img.imageSize = new Size(60, 45);
+    r.addSpacer();
+    w.addSpacer(4);
+    const r2 = w.addStack(); r2.addSpacer(); sign(r2, 13); r2.addSpacer();
+  } else {
+    const r = w.addStack(); r.centerAlignContent(); r.addSpacer();
+    const img = r.addImage(sleepyImage()); img.imageSize = new Size(fam === "large" ? 120 : 84, fam === "large" ? 90 : 63);
+    r.addSpacer(12);
+    sign(r, fam === "large" ? 18 : 15);
+    r.addSpacer();
+    if (fam === "large") {
+      w.addSpacer(14);
+      const t = w.addStack(); t.addSpacer();
+      txt(t, `내일 ${s.st.start}에 다시 열어요`, 11, C.muted, "semi");
+      t.addSpacer();
+    }
+  }
+  w.addSpacer();
+  /* 다음 날 출근 시간에 셔터가 올라가요 */
+  const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 5, 0, 0);
+  w.refreshAfterDate = tomorrow;
   return w;
 }
 
@@ -614,7 +730,7 @@ Script.complete();
 
 /* ---------- 기본값 ---------- */
 const DEFAULT_SETTINGS = {
-  v:2, start:'14:00', end:'17:50', mailEvery:30, leftover:'carry',
+  v:2, start:'14:00', end:'17:50', mailEvery:30, leftover:'carry', autoShutter:'',
   arrive:[
     {id:'a1', text:'출근 문자 보내기'},
     {id:'a2', text:'ERP 구동'},
@@ -690,6 +806,12 @@ function getDay(k){ const d = S.days[k]; if(!d) return blankDay(k);
   return Object.assign(blankDay(k), d, {arrive:d.arrive||{}, checks:d.checks||{}, tasks:d.tasks||[]}); }
 const live = t => !t.moved && !t.dropped;
 const rankOf = t => t.rank || (t.top ? 1 : 0);
+/* 셔터: '오늘은 퇴근'을 눌렀거나, 정해둔 시간이 지났을 때 (다시 올렸으면 자동은 무시) */
+function isClosed(day){
+  if(day.closedAt) return true;
+  const a = ST().autoShutter;
+  return !!(a && !day.reopened && day.date===todayKey() && nowMins() >= minsOf(a));
+}
 function mailSlots(){
   const st = ST(), out = [], step = Math.max(10, Number(st.mailEvery)||30);
   for(let m = minsOf(st.start); m < minsOf(st.end); m += step) out.push(hhmm(m));
@@ -724,6 +846,15 @@ function mascotSvg(size){
    '<circle cx="50" cy="56" r="3.6" fill="#1E2E3D"/><circle cx="72" cy="56" r="3.6" fill="#1E2E3D"/><circle cx="51.2" cy="54.8" r="1.2" fill="#fff"/><circle cx="73.2" cy="54.8" r="1.2" fill="#fff"/>'+
    '<path d="M56 63q5 5 10 0" stroke="#1E2E3D" stroke-width="2.4" fill="none" stroke-linecap="round"/>'+
    '<ellipse cx="42" cy="63" rx="5" ry="3" fill="var(--blush)"/><ellipse cx="80" cy="63" rx="5" ry="3" fill="var(--blush)"/></svg>';
+}
+function sleepySvg(size){
+  return '<svg class="sleepy" width="'+size+'" height="'+Math.round(size*.75)+'" viewBox="0 0 120 90" aria-hidden="true">'+
+   '<g transform="translate(-6 -18) scale(5.5)" fill="var(--cloud-shade)" opacity=".55"><g transform="translate(0 .5)">'+CL+'</g></g>'+
+   '<g transform="translate(-6 -18) scale(5.5)" fill="var(--cloud)">'+CL+'</g>'+
+   '<path d="M45 61q5 4 10 0M67 61q5 4 10 0" stroke="#1E2E3D" stroke-width="2.4" fill="none" stroke-linecap="round"/>'+
+   '<path d="M57 68q4 2 8 0" stroke="#1E2E3D" stroke-width="2" fill="none" stroke-linecap="round"/>'+
+   '<ellipse cx="42" cy="67" rx="5" ry="3" fill="var(--blush)"/><ellipse cx="80" cy="67" rx="5" ry="3" fill="var(--blush)"/>'+
+   '<text x="92" y="22" font-size="13" font-weight="700" fill="var(--accent)" class="z1">z</text><text x="102" y="12" font-size="10" font-weight="700" fill="var(--accent)" class="z2">z</text></svg>';
 }
 function stickerSvg(key, size){
   size = size || 30;
@@ -898,7 +1029,7 @@ const alarm = {
 };
 function checkAlarms(){
   const k = todayKey(), day = getDay(k), n = nowMins();
-  if(day.wrapped) return;
+  if(day.wrapped || isClosed(day)) return;
   const due = [];
   mailSlots().forEach(t => { if(!slotOk(day,t)) due.push([t, t+' 메일·결재 확인', '샘플실 메일함이랑 결재함을 확인할 시간이에요']); });
   closingToday(k).forEach(c => { if(c.time) due.push([c.time, c.time+' '+c.text, c.text==='퇴근' ? '오늘도 수고했어요!' : '마감 할 일이에요']); });
@@ -945,7 +1076,14 @@ function closeState(k){
     return {c, s};
   });
 }
+function shutterHTML(day){
+  const a = acornsOf(day), lt = day.tasks.filter(live), done = lt.filter(t => t.done).length;
+  return '<div class="shutter" role="img" aria-label="오늘 셔터를 내렸어요"><div class="housing"><span>'+cloudSvg(14,'white')+'뭉게뭉게</span></div>'+
+    '<div class="sh-body">'+sleepySvg(92)+'<div class="sign"><b>오늘 셔터 내립니다!</b><span>구름 '+a+'개 모으고 퇴근 · 끝낸 일 '+done+'/'+lt.length+'</span><span class="tm">내일 '+esc(ST().start)+'에 다시 열어요</span></div></div>'+
+    '<button class="btn sm sh-open" data-act="openShutter">셔터 다시 올리기</button><span class="handle"></span></div>';
+}
 function clockHTML(){
+  if(isClosed(getDay(todayKey()))) return shutterHTML(getDay(todayKey()));
   const st = ST(), s = minsOf(st.start), e = minsOf(st.end), n = nowMins(), k = todayKey(), day = getDay(k), ph = phase();
   let label, big;
   if(ph==='before'){ label = '출근까지'; big = dur(s-n); }
@@ -969,10 +1107,11 @@ function clockHTML(){
   const fl = focus
     ? '<span class="lbl">지금 하는 일</span><b>'+esc(focus.text)+'</b><button class="btn sm" data-act="toggle" data-k="'+k+'" data-id="'+focus.id+'">다 했어요</button>'
     : (top ? '<span class="lbl">오늘의 '+rankOf(top)+'순위</span><b>'+esc(top.text)+'</b><button class="btn sm" data-act="focus" data-k="'+k+'" data-id="'+top.id+'">지금 시작</button>' : '<span class="lbl">아래 할 일에서 ★를 눌러 1·2·3순위를 정해요</span>');
+  const goHome = '<button class="btn sm gohome" data-act="goHome">'+cloudSvg(14,'accent')+'오늘은 퇴근</button>';
   return '<div style="min-width:0"><div class="bubble">'+cloudSvg(18,'accent')+'<span>'+esc(say)+'</span></div>'+
     '<div class="clock-label">'+label+'</div><div class="clock-big">'+big+'</div>'+
     '<div class="track" aria-hidden="true"><div class="fill" style="width:'+pct+'%"></div>'+ticks+'<span class="me" style="left:'+pct+'%">'+cloudSvg(30)+'</span></div>'+
-    '<div class="focus-line">'+fl+'</div></div>'+jarHTML(day);
+    '<div class="focus-line">'+fl+goHome+'</div></div>'+jarHTML(day);
 }
 function jarHTML(day){
   const a = acornsOf(day), nx = nextSticker(a), stk = stickerFor(a);
@@ -982,6 +1121,7 @@ function jarHTML(day){
 }
 function alertsHTML(){
   const k = todayKey(), day = getDay(k), od = overdueSlot(day), out = [];
+  if(isClosed(day)) return '';
   if(od){
     out.push('<div class="banner"><span class="bell">'+ICON.bell+'</span><div class="msg"><b>'+esc(od)+' 샘플실 메일·결재 확인</b>하던 일은 잠깐 두고 메일함이랑 결재함만 보고 와요.</div>'+
       '<button class="btn main sm" data-act="slot" data-t="'+esc(od)+'">확인했어요</button></div>');
@@ -992,7 +1132,7 @@ function alertsHTML(){
     out.push('<div class="banner calm"><div class="msg"><b>지금: '+esc(cs.c.text)+(cs.c.note?' <span style="font-weight:400">('+esc(cs.c.note)+')</span>':'')+'</b>'+(mon?'월요일이에요. '+esc(mon.text)+'도 잊지 마세요.':'마감 순서대로 하나씩 해요.')+'</div></div>');
   }
   if(nowMins() >= firstCloseMins()-10 && !day.wrapped && day.tasks.some(live)){
-    out.push('<div class="banner calm"><div class="msg"><b>퇴근 준비할 시간이에요</b>못 끝낸 일은 내일로 넘기거나 보내주고, 오늘 한 줄을 남겨요.</div><button class="btn main" data-act="openWrap">오늘 마무리하기</button></div>');
+    out.push('<div class="banner calm"><div class="msg"><b>퇴근 준비할 시간이에요</b>못 끝낸 일은 내일로 넘기거나 보내주고, 오늘 한 줄을 남겨요.</div><button class="btn main" data-act="goHome">마무리하고 퇴근하기</button></div>');
   }
   return out.join('');
 }
@@ -1188,6 +1328,7 @@ function renderSettings(){
     '<div class="field"><span class="lbl">일하는 시간</span><div class="row"><input type="time" id="set-start" data-act="setTime" data-f="start" value="'+esc(st.start)+'"> ~ <input type="time" id="set-end" data-act="setTime" data-f="end" value="'+esc(st.end)+'"> <span class="tag">끝나는 시간 = 퇴근</span></div></div>'+
     '<div class="field"><span class="lbl">샘플실 메일·결재 확인 간격</span><div class="seg" role="group">'+[15,20,30,60].map(m => '<button data-act="mailEvery" data-v="'+m+'" aria-pressed="'+(Number(st.mailEvery)===m)+'">'+m+'분</button>').join('')+'</div><p class="sub" style="margin:0">'+esc(st.start)+'부터 '+esc(st.end)+' 전까지 '+mailSlots().length+'번 알려줘요.</p></div>'+
     '<p class="sub">출근하면 먼저 할 일과 마감할 때 할 일은 오늘 화면의 각 카드에서 "수정"을 눌러 바꿀 수 있어요.</p>'+
+    '<div class="field"><span class="lbl">셔터 자동으로 내리기</span><p class="sub" style="margin:0">퇴근 버튼을 깜빡해도 이 시간이 되면 앱과 위젯에 셔터가 내려가요. 일이 늦게 끝나는 날엔 비워두고 "오늘은 퇴근"을 직접 눌러요.</p><div class="row"><input type="time" id="set-auto" data-act="setAuto" value="'+esc(st.autoShutter||'')+'" aria-label="셔터 내릴 시간">'+(st.autoShutter?'<button class="btn sm ghost" data-act="autoShutterOff">자동 안 함</button>':'<span class="tag">지금은 자동으로 안 내려요</span>')+'</div></div>'+
     '<div class="field"><span class="lbl">못 끝낸 일 기본 처리</span><div class="seg" role="group"><button data-act="leftover" data-v="carry" aria-pressed="'+(st.leftover==='carry')+'">내일로 넘기기</button><button data-act="leftover" data-v="drop" aria-pressed="'+(st.leftover==='drop')+'">보내주기</button></div></div>'+
     '<div class="field"><span class="lbl">카테고리</span><div style="display:grid;gap:8px">'+cats+'</div><div class="row"><input type="text" id="cat-new" data-enter="catAdd" placeholder="새 카테고리 이름" aria-label="새 카테고리 이름"><button class="btn sm" data-act="catAdd">추가</button></div></div>'+
     storageSettingsHTML()+'</section>';
@@ -1203,7 +1344,7 @@ function wrapModalHTML(){
     (left.length ? '<h3 style="margin-top:16px">못 끝낸 일 '+left.length+'개</h3><div class="row" style="margin:6px 0"><button class="btn sm" data-act="wrapAll" data-v="carry">전부 내일로</button><button class="btn sm" data-act="wrapAll" data-v="drop">전부 보내주기</button></div>'+rows
       : '<p class="sub" style="margin-top:14px">오늘 할 일을 다 끝냈어요!</p>')+
     '<div class="field" style="margin:16px 0 0"><label for="wrap-memo">오늘 한 줄</label><input type="text" id="wrap-memo" data-draft="memo" value="'+esc(S.wrap.memo)+'" placeholder="오늘 어땠는지 한 줄로" maxlength="120"></div>'+
-    '<div class="acts"><button class="btn ghost" data-act="closeWrap">취소</button><button class="btn main" data-act="confirmWrap">마무리하기</button></div></div></div>';
+    '<div class="acts"><button class="btn ghost" data-act="closeWrap">취소</button><button class="btn main" data-act="confirmWrap">'+(S.wrap.shutter?'마무리하고 셔터 내리기':'마무리하기')+'</button></div></div></div>';
 }
 /* ---------- 구글 시트 연결 화면 ---------- */
 function renderSetup(){
@@ -1370,11 +1511,19 @@ const actions = {
       day.tasks.forEach(t => { if(t.done || !live(t)) return; const ch = S.wrap.choices[t.id] || ST().leftover;
         if(ch==='carry'){ t.moved = nk; copies.push({id:uid(), text:t.text, cat:t.cat, pri:t.pri, top:false, done:false, from:k, c:Date.now()+copies.length}); }
         else t.dropped = true; });
-      day.wrapped = true; day.memo = memo; day.focus = null; }, true);
+      day.wrapped = true; day.memo = memo; day.focus = null; if(S.wrap.shutter){ day.closedAt = Date.now(); delete day.reopened; } }, true);
     if(copies.length) mutateDay(nk, day => { day.tasks.push(...copies); }, true);
-    S.wrap = null; render(); toast('오늘 구름 '+acornsOf(getDay(k))+'개 저장! 수고했어요');
+    const sh = S.wrap.shutter; S.wrap = null; render(); toast(sh ? '오늘 셔터 내립니다! 수고했어요' : '오늘 구름 '+acornsOf(getDay(k))+'개 저장! 수고했어요');
   },
   unwrap: () => mutateDay(todayKey(), day => { day.wrapped = false; }),
+  goHome: () => {
+    const day = getDay(todayKey());
+    if(!day.wrapped && day.tasks.some(t => live(t))){ S.wrap = {choices:{}, memo:day.memo||'', shutter:true}; render(); return; }
+    mutateDay(todayKey(), d => { d.closedAt = Date.now(); delete d.reopened; d.focus = null; });
+    toast('오늘 셔터 내립니다! 수고했어요');
+  },
+  openShutter: () => { mutateDay(todayKey(), d => { delete d.closedAt; d.reopened = true; }); toast('셔터를 다시 올렸어요'); },
+  autoShutterOff: () => mutateSettings(st => { st.autoShutter = ''; }),
   bringLeft: el => {
     const pk = el.dataset.k, k = todayKey(), copies = [];
     mutateDay(pk, day => { day.tasks.forEach(t => { if(!t.done && live(t)){ t.moved = k; copies.push({id:uid(), text:t.text, cat:t.cat, pri:t.pri, top:false, done:false, from:pk, c:Date.now()+copies.length}); } }); day.wrapped = true; }, true);
@@ -1427,6 +1576,7 @@ document.addEventListener('change', e => {
   const i = Number(el.dataset.i);
   if(act==='draftCat'){ S.draft[el.dataset.ctx].cat = el.value; return; }
   if(act==='draftPri'){ S.draft[el.dataset.ctx].pri = Number(el.value); return; }
+  if(act==='setAuto'){ mutateSettings(st => { st.autoShutter = el.value || ''; }); return; }
   if(act==='setTime'){ const v = el.value; if(v) mutateSettings(s => { s[el.dataset.f] = v; }); return; }
   if(act==='catName'){ const v = el.value.trim(); if(v) mutateSettings(s => { s.cats[i].name = v; }); return; }
   if(act==='arrName'){ const v = el.value.trim(); if(v) mutateSettings(s => { s.arrive[i].text = v; }); return; }
