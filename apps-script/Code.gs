@@ -27,15 +27,17 @@ function out_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-/** 전부 읽기: GET ?key=비밀번호 */
+/** 읽기: GET ?key=비밀번호 (위젯은 &only=settings,d-2026-11-04 처럼 필요한 것만) */
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (p.key !== SECRET) return out_({ ok: false, error: 'key' });
+  const only = p.only ? String(p.only).split(',') : null; // 위젯은 오늘 것만 불러와요
   const values = sheet_().getDataRange().getValues();
   const docs = {};
   for (let i = 1; i < values.length; i++) {
     const id = values[i][0];
     if (!id) continue;
+    if (only && only.indexOf(id) < 0) continue;
     try { docs[id] = JSON.parse(values[i][1]); } catch (err) {}
   }
   return out_({ ok: true, docs: docs, now: Date.now() });

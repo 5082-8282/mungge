@@ -329,6 +329,233 @@ h3{font-size:15px}
 <div class="wrap" id="app"></div>
 <div id="splash" aria-hidden="true"><svg class="drift d1" width="170" viewBox="3 5 18.5 14" aria-hidden="true" style="opacity:.95"><g fill="var(--cloud-shade)" opacity=".45" transform="translate(0 .6)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g><g fill="var(--cloud)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g></svg><svg class="drift d2" width="110" viewBox="3 5 18.5 14" aria-hidden="true" style="opacity:.8"><g fill="var(--cloud-shade)" opacity=".45" transform="translate(0 .6)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g><g fill="var(--cloud)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g></svg><svg class="drift d3" width="220" viewBox="3 5 18.5 14" aria-hidden="true" style="opacity:.85"><g fill="var(--cloud-shade)" opacity=".45" transform="translate(0 .6)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g><g fill="var(--cloud)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g></svg><svg class="drift d4" width="90" viewBox="3 5 18.5 14" aria-hidden="true" style="opacity:.7"><g fill="var(--cloud-shade)" opacity=".45" transform="translate(0 .6)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g><g fill="var(--cloud)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g></svg><div class="stage"><svg class="mascot" width="150" height="112" viewBox="0 0 120 90" aria-hidden="true"><g transform="translate(-6 -22) scale(5.5)" fill="var(--cloud-shade)" opacity=".55"><g transform="translate(0 .5)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g></g><g transform="translate(-6 -22) scale(5.5)" fill="var(--cloud)"><circle cx="7.5" cy="14.5" r="3.6"/><circle cx="12" cy="11" r="5"/><circle cx="16.8" cy="13.8" r="4.2"/><rect x="7.5" y="13" width="9.3" height="5.1"/></g><circle cx="50" cy="56" r="3.6" fill="#1E2E3D"/><circle cx="72" cy="56" r="3.6" fill="#1E2E3D"/><circle cx="51.2" cy="54.8" r="1.2" fill="#fff"/><circle cx="73.2" cy="54.8" r="1.2" fill="#fff"/><path d="M56 63q5 5 10 0" stroke="#1E2E3D" stroke-width="2.4" fill="none" stroke-linecap="round"/><ellipse cx="42" cy="63" rx="5" ry="3" fill="var(--blush)"/><ellipse cx="80" cy="63" rx="5" ry="3" fill="var(--blush)"/></svg><div class="name"><span>뭉</span><span>게</span><span>뭉</span><span>게</span></div><div class="tagline">오늘 할 일, 구름처럼 차곡차곡</div></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<script type="text/plain" id="widget-src">// 뭉게뭉게 위젯 (아이폰 Scriptable 앱용)
+// 앱 설정의 "위젯 코드 복사"로 복사하면 아래 두 줄이 이미 채워져 있어요.
+// 직접 붙여넣었다면 구글 시트 웹 앱 URL과 비밀번호를 따옴표 안에 넣어주세요.
+const SHEET_URL = "__URL__";
+const SECRET = "__KEY__";
+const APP_URL = "https://5082-8282.github.io/mungge/";
+
+const C = {
+  bgTop: Color.dynamic(new Color("#FBFDFF"), new Color("#1D3A57")),
+  bgBottom: Color.dynamic(new Color("#E1F1FC"), new Color("#121A22")),
+  ink: Color.dynamic(new Color("#1E2E3D"), new Color("#E6EEF5")),
+  muted: Color.dynamic(new Color("#6B7E8F"), new Color("#93A6B7")),
+  accent: Color.dynamic(new Color("#2A6FA8"), new Color("#8DC4F0")),
+  alert: Color.dynamic(new Color("#E07A4F"), new Color("#F09068")),
+  soft: Color.dynamic(new Color("#FFFFFF", 0.75), new Color("#FFFFFF", 0.08))
+};
+const CAT = { sky: "#5AAAE6", rose: "#3A6796", leaf: "#3E9DB0", tang: "#7F94DB", lilac: "#9DB4CC", sand: "#6F8699" };
+
+const pad = n => String(n).padStart(2, "0");
+const now = new Date();
+const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+const nowM = now.getHours() * 60 + now.getMinutes();
+const mins = t => { const [h, m] = String(t).split(":").map(Number); return h * 60 + (m || 0); };
+const at = t => { const d = new Date(now); d.setHours(Math.floor(mins(t) / 60), mins(t) % 60, 0, 0); return d; };
+
+async function load() {
+  const url = `${SHEET_URL}?key=${encodeURIComponent(SECRET)}&only=settings,d-${today}&t=${Date.now()}`;
+  const req = new Request(url);
+  req.timeoutInterval = 20;
+  const j = await req.loadJSON();
+  if (!j.ok) throw new Error(j.error === "key" ? "비밀번호가 달라요" : "불러오지 못했어요");
+  return j.docs || {};
+}
+
+function summarize(docs) {
+  const st = Object.assign({ start: "14:00", end: "17:50", mailEvery: 30, cats: [], close: [] }, docs.settings || {});
+  const day = docs["d-" + today] || { tasks: [], checks: {} };
+  const tasks = (day.tasks || []).filter(t => !t.moved && !t.dropped);
+  const left = tasks.filter(t => !t.done)
+    .sort((a, b) => (b.top ? 1 : 0) - (a.top ? 1 : 0) || (a.pri || 2) - (b.pri || 2) || (a.c || 0) - (b.c || 0));
+  const checks = day.checks || {};
+  const ok = t => { const c = checks[t]; return !!(c && (c.ok || (c.mail && c.appr))); };
+  let clouds = 0;
+  tasks.forEach(t => { if (t.done) clouds += t.top ? 2 : 1; });
+  Object.keys(checks).forEach(t => { if (ok(t)) clouds += 1; });
+  const step = Math.max(10, Number(st.mailEvery) || 30), slots = [];
+  for (let m = mins(st.start); m < mins(st.end); m += step) slots.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
+  const late = slots.find(t => mins(t) <= nowM && nowM < mins(t) + step && !ok(t));
+  const next = slots.find(t => mins(t) > nowM);
+  const closeNext = (st.close || []).filter(c => c.time && mins(c.time) >= nowM)
+    .sort((a, b) => mins(a.time) - mins(b.time))[0];
+  const color = id => { const c = (st.cats || []).find(x => x.id === id); return new Color(CAT[(c && c.color) || "sand"] || CAT.sand); };
+  const focus = tasks.find(t => t.id === day.focus && !t.done);
+  return { st, left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
+}
+
+/* ---------- 그리기 ---------- */
+function txt(stack, s, size, color, weight, lines) {
+  const t = stack.addText(String(s));
+  t.font = weight === "bold" ? Font.boldRoundedSystemFont(size) : weight === "semi" ? Font.semiboldRoundedSystemFont(size) : Font.roundedSystemFont(size);
+  t.textColor = color;
+  t.lineLimit = lines || 1;
+  t.minimumScaleFactor = 0.7;
+  return t;
+}
+function icon(stack, name, size, color) {
+  const sym = SFSymbol.named(name);
+  sym.applyFont(Font.systemFont(size));
+  const img = stack.addImage(sym.image);
+  img.imageSize = new Size(size * 1.15, size);
+  img.tintColor = color;
+  return img;
+}
+function header(w, s) {
+  const row = w.addStack();
+  row.centerAlignContent();
+  icon(row, "cloud.fill", 12, C.accent);
+  row.addSpacer(4);
+  txt(row, "뭉게뭉게", 11, C.accent, "bold");
+  row.addSpacer();
+  icon(row, "cloud", 11, C.muted);
+  row.addSpacer(2);
+  txt(row, s.clouds, 11, C.ink, "bold");
+}
+function countdown(stack, s, size) {
+  const startD = at(s.st.start), endD = at(s.st.end);
+  let label, target = null;
+  if (now < startD) { label = "출근까지"; target = startD; }
+  else if (now < endD) { label = `퇴근(${s.st.end})까지`; target = endD; }
+  else label = "오늘 근무";
+  txt(stack, label, 11, C.muted, "semi");
+  if (target) {
+    const d = stack.addDate(target);
+    d.applyTimerStyle();
+    d.font = Font.boldRoundedSystemFont(size);
+    d.textColor = C.ink;
+    d.lineLimit = 1;
+    d.minimumScaleFactor = 0.6;
+  } else txt(stack, "끝! 수고했어요", size * 0.62, C.ink, "bold");
+}
+function status(stack, s, size) {
+  const row = stack.addStack();
+  row.centerAlignContent();
+  if (s.late) {
+    icon(row, "bell.fill", size, C.alert);
+    row.addSpacer(4);
+    txt(row, `${s.late} 메일·결재 확인`, size, C.alert, "bold");
+  } else if (s.closeNext && mins(s.closeNext.time) - nowM <= 15) {
+    icon(row, "clock.fill", size, C.accent);
+    row.addSpacer(4);
+    txt(row, `${s.closeNext.time} ${s.closeNext.text}`, size, C.accent, "bold");
+  } else if (s.next && now >= at(s.st.start)) {
+    icon(row, "envelope", size, C.muted);
+    row.addSpacer(4);
+    txt(row, `다음 메일·결재 ${s.next}`, size, C.muted, "semi");
+  } else {
+    icon(row, "checkmark.circle", size, C.muted);
+    row.addSpacer(4);
+    txt(row, `끝낸 일 ${s.done} / ${s.total}`, size, C.muted, "semi");
+  }
+}
+function taskRow(stack, s, t, size) {
+  const row = stack.addStack();
+  row.centerAlignContent();
+  const dot = txt(row, t.top ? "★" : "●", t.top ? size - 1 : size - 4, t.top ? C.accent : s.color(t.cat));
+  dot.lineLimit = 1;
+  row.addSpacer(5);
+  txt(row, t.text, size, C.ink, t.top || (s.focus && s.focus.id === t.id) ? "semi" : "", 1);
+}
+function tasksBlock(stack, s, max, size) {
+  const head = stack.addStack();
+  txt(head, s.left.length ? `남은 할 일 ${s.left.length}` : "남은 할 일", 11, C.muted, "semi");
+  stack.addSpacer(5);
+  if (!s.left.length) { txt(stack, s.total ? "오늘 할 일 다 했어요!" : "앱에서 할 일을 적어주세요", size, C.accent, "semi", 2); return; }
+  const list = s.focus ? [s.focus].concat(s.left.filter(t => t.id !== s.focus.id)) : s.left;
+  list.slice(0, max).forEach((t, i) => { if (i) stack.addSpacer(4); taskRow(stack, s, t, size); });
+  if (s.left.length > max) { stack.addSpacer(3); txt(stack, `외 ${s.left.length - max}개`, 10, C.muted); }
+}
+
+function build(s) {
+  const w = new ListWidget();
+  const g = new LinearGradient();
+  g.colors = [C.bgTop, C.bgBottom];
+  g.locations = [0, 1];
+  w.backgroundGradient = g;
+  w.url = APP_URL;
+  const fam = config.widgetFamily || "medium";
+  w.setPadding(14, 15, 14, 15);
+  header(w, s);
+  w.addSpacer(6);
+  if (fam === "small") {
+    countdown(w, s, 26);
+    w.addSpacer();
+    const top = s.focus || s.left[0];
+    if (s.late) status(w, s, 11);
+    else if (top) { txt(w, s.focus ? "지금 하는 일" : (top.top ? "★ 1순위" : "다음 할 일"), 10, C.muted, "semi"); txt(w, top.text, 13, C.ink, "semi", 2); }
+    else status(w, s, 11);
+  } else {
+    const body = w.addStack();
+    const left = body.addStack();
+    left.layoutVertically();
+    left.size = new Size(fam === "large" ? 0 : 128, 0);
+    countdown(left, s, 30);
+    left.addSpacer();
+    status(left, s, 11);
+    body.addSpacer(12);
+    const right = body.addStack();
+    right.layoutVertically();
+    right.backgroundColor = C.soft;
+    right.cornerRadius = 12;
+    right.setPadding(8, 10, 8, 10);
+    tasksBlock(right, s, fam === "large" ? 4 : 3, 13);
+    right.addSpacer();
+    if (fam === "large") {
+      w.addSpacer(10);
+      const box = w.addStack();
+      box.layoutVertically();
+      box.backgroundColor = C.soft;
+      box.cornerRadius = 12;
+      box.setPadding(8, 10, 8, 10);
+      txt(box, "마감할 때", 11, C.muted, "semi");
+      box.addSpacer(4);
+      const isMon = now.getDay() === 1;
+      (s.st.close || []).filter(c => !c.mon || isMon).forEach(c => {
+        const r = box.addStack();
+        r.centerAlignContent();
+        const t = txt(r, c.time || "월요일", 12, C.accent, "bold");
+        r.addSpacer(8);
+        txt(r, c.text, 12, c.time && mins(c.time) < nowM ? C.muted : C.ink);
+        box.addSpacer(3);
+      });
+      box.addSpacer();
+    }
+  }
+  /* 시작·퇴근·다음 확인 시간에 맞춰 다시 그려요 (아이폰이 정확한 시간은 조절해요) */
+  const marks = [at(s.st.start), at(s.st.end)].concat(s.slots.map(at)).filter(d => d > now).sort((a, b) => a - b);
+  const soon = new Date(Date.now() + 15 * 60 * 1000);
+  w.refreshAfterDate = marks[0] && marks[0] < soon ? marks[0] : soon;
+  return w;
+}
+
+function errorWidget(msg) {
+  const w = new ListWidget();
+  w.backgroundColor = C.bgBottom;
+  w.url = APP_URL;
+  const row = w.addStack();
+  icon(row, "cloud.fill", 14, C.accent);
+  row.addSpacer(4);
+  txt(row, "뭉게뭉게", 12, C.accent, "bold");
+  w.addSpacer(8);
+  txt(w, msg, 13, C.ink, "semi", 3);
+  w.addSpacer();
+  txt(w, "앱 설정에서 위젯 코드를 다시 복사해 주세요", 10, C.muted, "", 2);
+  w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+  return w;
+}
+
+let widget;
+if (!/^https:\/\/script\.google/.test(SHEET_URL)) widget = errorWidget("구글 시트 웹 앱 URL이 아직 없어요");
+else {
+  try { widget = build(summarize(await load())); }
+  catch (e) { widget = errorWidget(String(e.message || e).includes("비밀번호") ? e.message : "인터넷 연결을 확인해 주세요"); }
+}
+if (config.runsInWidget) Script.setWidget(widget);
+else await widget.presentMedium();
+Script.complete();
+</script>
 <script>
 (function(){
 'use strict';
@@ -942,13 +1169,17 @@ function storageSettingsHTML(){
   if(store.kind==='cloud') txt = '할 일은 내 Claude 계정에 저장돼서 노트북과 폰에서 똑같이 보여요. 나만 볼 수 있어요.';
   else if(store.kind==='sheet'){ txt = '구글 시트에 저장하고 있어요. 30초마다 다른 기기에서 바꾼 내용을 불러와요.'; btn = '<button class="btn sm" data-act="sheetSync">지금 불러오기</button><button class="btn sm ghost" data-act="sheetOff">연결 바꾸기</button>'; }
   else { txt = '지금은 이 기기에만 저장되고 있어요.'; btn = '<button class="btn sm" data-act="sheetOn">구글 시트 연결하기</button>'; }
-  return '<div class="field" style="margin-bottom:0"><span class="lbl">저장 위치</span><p class="sub" style="margin:0">'+txt+'</p>'+(btn?'<div class="row">'+btn+'</div>':'')+'</div>';
+  const widget = '<div class="field" style="margin:18px 0 0"><span class="lbl">아이폰 위젯</span>'+
+    (store.kind==='sheet'
+      ? '<p class="sub" style="margin:0">Scriptable 앱에 붙여넣을 위젯 코드를 복사해요. 구글 시트 주소와 비밀번호가 이미 들어 있어요.</p><div class="row"><button class="btn sm main" data-act="copyWidget">위젯 코드 복사</button></div><textarea id="widget-out" readonly aria-label="위젯 코드" style="display:none;width:100%;height:120px;font-size:12px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--soft);color:var(--ink)"></textarea>'
+      : '<p class="sub" style="margin:0">위젯은 구글 시트에 저장된 할 일을 읽어와요. 구글 시트를 먼저 연결해 주세요.</p>')+'</div>';
+  return widget.replace('margin:18px 0 0','margin:0 0 18px')+'<div class="field" style="margin-bottom:0"><span class="lbl">저장 위치</span><p class="sub" style="margin:0">'+txt+'</p>'+(btn?'<div class="row">'+btn+'</div>':'')+'</div>';
 }
 
 function render(force){
   if(!S.loaded) return;
   const ae = document.activeElement;
-  const typing = ae && ae.tagName==='INPUT' && (ae.type==='text' || ae.type==='time');
+  const typing = ae && ((ae.tagName==='INPUT' && (ae.type==='text' || ae.type==='time')) || ae.tagName==='TEXTAREA');
   if(typing && !force){ S.deferred = true; return; }
   const fid = ae && ae.id, sel = typing && ae.type==='text' ? [ae.selectionStart, ae.selectionEnd] : null;
   let body;
@@ -1197,7 +1428,16 @@ Object.assign(actions, {
   localOnly: () => { LS.set('mung-localonly', true); store.kind = 'local'; S.view = 'today'; location.hash = '#today'; S.loaded = false; startStore(); },
   sheetOn: () => { store.kind = 'setup'; route(); },
   sheetOff: () => { clearInterval(store.pollTimer); store.kind = 'setup'; route(); },
-  sheetSync: () => { store.pull(); toast('구글 시트에서 불러왔어요'); }
+  sheetSync: () => { store.pull(); toast('구글 시트에서 불러왔어요'); },
+  copyWidget: () => {
+    const c = store.cfg || {}; const app = location.origin + location.pathname;
+    const code = document.getElementById('widget-src').textContent.trim()
+      .replace('"__URL__"', JSON.stringify(c.url||'')).replace('"__KEY__"', JSON.stringify(c.key||''))
+      .replace('"https://5082-8282.github.io/mungge/"', JSON.stringify(app));
+    const box = document.getElementById('widget-out');
+    const show = () => { if(box){ box.style.display = 'block'; box.value = code; box.focus(); box.select(); } toast('아래 코드를 길게 눌러 복사해 주세요'); };
+    try{ navigator.clipboard.writeText(code).then(() => toast('위젯 코드를 복사했어요. Scriptable에 붙여넣어요'), show); }catch(e){ show(); }
+  }
 });
 async function boot(){
   try{ if('serviceWorker' in navigator && location.protocol==='https:' && !window.claude){ navigator.serviceWorker.register('sw.js').then(r => { alarm.reg = r; }).catch(() => {}); } }catch(e){}
