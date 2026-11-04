@@ -1,0 +1,16 @@
+{
+  "name": "뭉게뭉게",
+  "short_name": "뭉게뭉게",
+  "description": "오늘 할 일, 구름처럼 차곡차곡",
+  "lang": "ko",
+  "start_url": "./#today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#EAF6FE",
+  "theme_color": "#3D8FD1",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
