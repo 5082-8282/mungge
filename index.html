@@ -104,7 +104,8 @@ h3{font-size:15px}
 .jar > svg{width:150px;height:auto;overflow:visible}
 .jar-num{font-family:var(--display);font-size:26px;line-height:1;color:var(--ink)}
 .jar-num small{font-family:var(--body);font-size:13px;color:var(--muted);margin-left:2px}
-.jar-next{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.jar-next{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:5px;line-height:1.35;text-align:left}
+.jar-next b{color:var(--accent-ink);font-weight:700}
 .jar .drop{animation:drop .7s cubic-bezier(.3,1.4,.6,1)}
 @keyframes drop{from{transform:translateY(-110px);opacity:0}30%{opacity:1}to{transform:none}}
 
@@ -1147,18 +1148,18 @@ function clockHTML(){
   else say = '▶ 버튼으로 지금 할 일을 골라요';
   const fl = focus
     ? '<span class="lbl">지금 하는 일</span><b>'+esc(focus.text)+'</b><button class="btn sm" data-act="toggle" data-k="'+k+'" data-id="'+focus.id+'">다 했어요</button>'
-    : (top ? '<span class="lbl">오늘의 '+rankOf(top)+'순위</span><b>'+esc(top.text)+'</b><button class="btn sm" data-act="focus" data-k="'+k+'" data-id="'+top.id+'">지금 시작</button>' : '<span class="lbl">아래 할 일에서 ★를 눌러 1·2·3순위를 정해요</span>');
+    : '';
   const goHome = '<button class="btn sm gohome" data-act="goHome">'+cloudSvg(14,'accent')+'오늘은 퇴근</button>';
   return '<div style="min-width:0"><div class="say-row"><div class="bubble">'+cloudSvg(18,'accent')+'<span>'+esc(say)+'</span></div>'+goHome+'</div>'+
     '<div class="clock-label">'+label+'</div><div class="clock-big">'+big+'</div>'+
     '<div class="track" aria-hidden="true"><div class="fill" style="width:'+pct+'%"></div>'+ticks+'<span class="me" style="left:'+pct+'%">'+cloudSvg(30)+'</span></div>'+
-    '<div class="focus-line">'+fl+'</div></div>'+jarHTML(day);
+    (fl ? '<div class="focus-line">'+fl+'</div>' : '')+'</div>'+jarHTML(day);
 }
 function jarHTML(day){
   const a = acornsOf(day), nx = nextSticker(a), stk = stickerFor(a);
   const drop = S.lastJar!=null && a > S.lastJar; S.lastJar = a;
   return '<div class="jar">'+jarSvg(a, drop)+'<div class="jar-num">'+a+'<small>개</small></div>'+
-    '<div class="jar-next">'+(stk?stickerSvg(stk.key,18):'')+(nx ? esc(nx.name)+'까지 '+(nx.min-a)+'개' : '황금 구름 달성!')+'</div></div>';
+    '<div class="jar-next">'+(stk?stickerSvg(stk.key,18):'')+(nx ? '<span>'+esc(nx.name)+'까지<br><b>'+(nx.min-a)+'개</b></span>' : '<span>무지개 달성!</span>')+'</div></div>';
 }
 function alertsHTML(){
   const k = todayKey(), day = getDay(k), od = overdueSlot(day), out = [];
@@ -1218,8 +1219,8 @@ function editRowsClose(){
 }
 function arriveHTML(day){
   const items = ST().arrive, editing = S.editArrive;
-  if(!items.length && !editing) return '<section class="card arrive"><div class="card-head"><h2>출근하면 먼저</h2><button class="btn sm right" data-act="editArrive">수정</button></div><p class="sub" style="margin:0">출근하면 할 일을 적어두세요.</p></section>';
-  return '<section class="card arrive"><div class="card-head"><h2>출근하면 먼저</h2><button class="btn sm right '+(editing?'main':'')+'" data-act="editArrive">'+(editing?'완료':'수정')+'</button></div>'+
+  if(!items.length && !editing) return '<section class="card arrive"><div class="card-head"><h2>출근하면 먼저</h2>'+'<span class="tag" style="margin-left:6px">'+fmtDate(todayKey())+'</span>'+'<button class="btn sm right" data-act="editArrive">수정</button></div><p class="sub" style="margin:0">출근하면 할 일을 적어두세요.</p></section>';
+  return '<section class="card arrive"><div class="card-head"><h2>출근하면 먼저</h2>'+'<span class="tag" style="margin-left:6px">'+fmtDate(todayKey())+'</span>'+'<button class="btn sm right '+(editing?'main':'')+'" data-act="editArrive">'+(editing?'완료':'수정')+'</button></div>'+
     (editing ? editRowsArrive() : '<ol class="arrive-list">'+items.map((a,i) => '<li class="arrive-item"><span class="num">'+(i+1)+'</span>'+esc(a.text)+'</li>').join('')+'</ol>')+'</section>';
 }
 function closingHTML(k){
