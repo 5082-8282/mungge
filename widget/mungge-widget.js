@@ -54,13 +54,8 @@ function summarize(docs) {
   const catName = id => { const c = (st.cats || []).find(x => x.id === id); return c && c.name ? String(c.name).replace(/ ?업무$/, "") : "기타"; };
   const focus = tasks.find(t => t.id === day.focus && !t.done);
   const topT = tasks.find(t => t.top);
-  /* 정기 알림 (예: 3개월마다 비밀번호): 미리 알림 기간이면 위젯에도 표시 */
-  const addM = (k, n) => { const [y, m, d] = k.split("-").map(Number); const dt = new Date(y, m - 1 + Number(n || 3), 1); const last = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); dt.setDate(Math.min(d, last)); return dt; };
-  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const reminds = (st.reminders || []).filter(r => r.last && r.text).map(r => ({ text: r.text, left: Math.round((addM(r.last, r.months) - today0) / 86400000), notice: Number(r.notice) || 7 }))
-    .filter(x => x.left <= x.notice);
   const closed = !!day.closedAt || !!(st.autoShutter && !day.reopened && nowM >= mins(st.autoShutter));
-  return { st, closed, reminds, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
+  return { st, closed, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
 }
 
 /* ---------- 그리기 ---------- */
@@ -172,14 +167,6 @@ function listBox(parent, s, opt) {
   if (s.total) txt(head, `${s.done}/${s.total}`, 9.5, C.muted, "semi");
   box.addSpacer(5);
   let max = opt.max;
-  (s.reminds || []).slice(0, 1).forEach(x => {
-    const r = box.addStack(); r.centerAlignContent();
-    icon(r, "lock.fill", 9, x.left <= 0 ? C.alert : C.accent);
-    r.addSpacer(4);
-    txt(r, `${x.text} ${x.left > 0 ? "D-" + x.left : x.left === 0 ? "오늘" : -x.left + "일 지남"}`, opt.size - 1, x.left <= 0 ? C.alert : C.accent, "semi");
-    box.addSpacer(opt.gap + 1);
-    max = Math.max(1, max - 1);
-  });
   if (!s.left.length) {
     txt(box, s.total ? "오늘 할 일 다 했어요!" : "앱에서 할 일을 적어주세요", opt.size, C.accent, "semi", 2);
     box.addSpacer();

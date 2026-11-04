@@ -58,7 +58,7 @@ button{cursor:pointer}
 h1,h2,h3{font-family:var(--body);font-weight:700;margin:0;text-wrap:balance}
 h2{font-size:16px;letter-spacing:-.01em}
 h3{font-size:15px}
-.wrap{max-width:1080px;margin:0 auto;padding:16px 16px 64px}
+.wrap{max-width:1280px;margin:0 auto;padding:16px 16px 64px}
 
 /* header */
 .top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
@@ -149,6 +149,27 @@ h3{font-size:15px}
 
 /* layout */
 .cols{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:12px;align-items:start}
+/* 컴퓨터: 오늘 할 일 | 메모장 나란히, 오른쪽에 메일·마감 */
+.pane-wrap{min-width:0}
+.pager{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:12px;align-items:stretch}
+.pager-tabs{display:none}
+.memo{display:flex;flex-direction:column}
+.memo textarea{flex:1;min-height:320px;width:100%;resize:vertical;border:0;outline:none;background:
+  repeating-linear-gradient(180deg,transparent 0 27px,var(--line) 27px 28px);background-attachment:local;
+  line-height:28px;font:inherit;font-size:14.5px;line-height:28px;color:var(--ink);padding:0 2px}
+.memo textarea::placeholder{color:var(--muted)}
+@media (min-width:1100px){.cols{grid-template-columns:minmax(0,2.5fr) minmax(0,1fr)}}
+@media (max-width:1099px) and (min-width:561px){.pager{grid-template-columns:1fr}.memo textarea{min-height:200px}}
+/* 폰: 오늘 할 일을 옆으로 넘기면 메모장 */
+@media (max-width:560px){
+  .pager-tabs{display:flex;gap:4px;margin:0 0 8px;background:color-mix(in srgb,var(--accent) 9%,var(--card));padding:3px;border-radius:11px;width:max-content}
+  .pager-tabs button{border:0;background:transparent;border-radius:8px;padding:5px 14px;font-size:13.5px;font-weight:500;color:var(--muted)}
+  .pager-tabs button[aria-selected="true"]{background:var(--card);color:var(--accent-ink);box-shadow:0 1px 3px rgba(30,60,90,.12)}
+  .pager{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;margin:0 -22px;padding:0 22px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-padding:0 22px;align-items:stretch}
+  .pager::-webkit-scrollbar{display:none}
+  .pager > .pane{flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always}
+  .memo textarea{min-height:300px}
+}
 .side{display:grid;gap:12px}
 @media (max-width:860px){.cols{grid-template-columns:1fr}}
 @media (max-width:560px){
@@ -428,13 +449,8 @@ function summarize(docs) {
   const catName = id => { const c = (st.cats || []).find(x => x.id === id); return c && c.name ? String(c.name).replace(/ ?업무$/, "") : "기타"; };
   const focus = tasks.find(t => t.id === day.focus && !t.done);
   const topT = tasks.find(t => t.top);
-  /* 정기 알림 (예: 3개월마다 비밀번호): 미리 알림 기간이면 위젯에도 표시 */
-  const addM = (k, n) => { const [y, m, d] = k.split("-").map(Number); const dt = new Date(y, m - 1 + Number(n || 3), 1); const last = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); dt.setDate(Math.min(d, last)); return dt; };
-  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const reminds = (st.reminders || []).filter(r => r.last && r.text).map(r => ({ text: r.text, left: Math.round((addM(r.last, r.months) - today0) / 86400000), notice: Number(r.notice) || 7 }))
-    .filter(x => x.left <= x.notice);
   const closed = !!day.closedAt || !!(st.autoShutter && !day.reopened && nowM >= mins(st.autoShutter));
-  return { st, closed, reminds, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
+  return { st, closed, catName, top: topT && !topT.done ? topT : null, topDone: !!(topT && topT.done), left, done: tasks.length - left.length, total: tasks.length, clouds, late, next, closeNext, color, focus, wrapped: !!day.wrapped, slots };
 }
 
 /* ---------- 그리기 ---------- */
@@ -546,14 +562,6 @@ function listBox(parent, s, opt) {
   if (s.total) txt(head, `${s.done}/${s.total}`, 9.5, C.muted, "semi");
   box.addSpacer(5);
   let max = opt.max;
-  (s.reminds || []).slice(0, 1).forEach(x => {
-    const r = box.addStack(); r.centerAlignContent();
-    icon(r, "lock.fill", 9, x.left <= 0 ? C.alert : C.accent);
-    r.addSpacer(4);
-    txt(r, `${x.text} ${x.left > 0 ? "D-" + x.left : x.left === 0 ? "오늘" : -x.left + "일 지남"}`, opt.size - 1, x.left <= 0 ? C.alert : C.accent, "semi");
-    box.addSpacer(opt.gap + 1);
-    max = Math.max(1, max - 1);
-  });
   if (!s.left.length) {
     txt(box, s.total ? "오늘 할 일 다 했어요!" : "앱에서 할 일을 적어주세요", opt.size, C.accent, "semi", 2);
     box.addSpacer();
@@ -1273,11 +1281,23 @@ function renderToday(){
     '<section class="hero" id="clock">'+clockHTML()+'</section>'+
     '<div id="alerts">'+alertsHTML()+'</div>'+
     remindersHTML()+leftoverHTML()+(arrTop ? arriveHTML(day) : '')+
-    '<div class="cols"><section class="card"><div class="card-head"><h2>오늘 할 일</h2><span class="count">'+done+' / '+liveT.length+'</span>'+
+    '<div class="cols"><div class="pane-wrap">'+pagerTabs()+'<div class="pager" id="pager"><section class="card pane" id="pane-tasks"><div class="card-head"><h2>오늘 할 일</h2><span class="count">'+done+' / '+liveT.length+'</span>'+
       (day.wrapped ? '<button class="btn sm right" data-act="unwrap">마무리 다시 열기</button>' : '<button class="btn sm right" data-act="openWrap">오늘 마무리</button>')+'</div>'+
       filt+addFormHTML('today')+
       (rows ? '<ul class="tasks">'+rows+'</ul>' : '<div class="empty">'+(S.filter==='all'?'오늘 할 일이 아직 없어요. 위에 적거나 계획 탭에서 미리 적어둬요.':'이 카테고리에는 할 일이 없어요.')+'</div>')+
-    '</section><aside class="side" id="side">'+sideHTML(day)+'</aside></div>';
+    '</section>'+memoHTML()+'</div></div><aside class="side" id="side">'+sideHTML(day)+'</aside></div>';
+}
+/* ---------- 메모장: 하나의 메모를 계속 써요 (자동 저장) ---------- */
+function memoHTML(){
+  const m = S.memo || {};
+  const when = m.updatedAt ? new Date(m.updatedAt) : null;
+  const stamp = when ? (keyOf(when)===todayKey() ? '오늘 ' : shortDate(keyOf(when))+' ')+pad(when.getHours())+':'+pad(when.getMinutes())+' 저장' : '적으면 저절로 저장돼요';
+  return '<section class="card pane memo" id="pane-memo"><div class="card-head"><h2>메모장</h2><span class="count" id="memo-stamp">'+stamp+'</span></div>'+
+    '<textarea id="memo-text" data-draft="memopad" placeholder="전화 받은 내용, 떠오른 아이디어, 내일 할 말…" aria-label="메모장">'+esc(m.text||'')+'</textarea></section>';
+}
+function pagerTabs(){
+  const i = S.pagerIndex||0;
+  return '<div class="pager-tabs" role="tablist"><button role="tab" data-act="pagerGo" data-v="0" aria-selected="'+(i===0)+'">오늘 할 일</button><button role="tab" data-act="pagerGo" data-v="1" aria-selected="'+(i===1)+'">메모장</button></div>';
 }
 function sideHTML(day){ const arrTop = nowMins() < minsOf(ST().start)+30 && !day.wrapped; return (arrTop ? '' : arriveHTML(day))+'<div id="mail-card">'+mailHTML(day)+'</div><div id="close-card">'+closingHTML(day.date)+'</div>'; }
 
@@ -1431,6 +1451,15 @@ function render(force){
   document.getElementById('app').innerHTML = headerHTML()+body+wrapModalHTML();
   if(fid){ const el = document.getElementById(fid); if(el){ el.focus({preventScroll:true}); if(sel && el.setSelectionRange){ try{ el.setSelectionRange(sel[0],sel[1]); }catch(e){} } } }
   updateTitle(); S.deferred = false;
+  const pg = document.getElementById('pager');
+  if(pg){
+    const step = () => { const ps = pg.querySelectorAll('.pane'); return ps.length > 1 ? Math.max(1, ps[1].offsetLeft - ps[0].offsetLeft) : 1; };
+    if(S.pagerIndex) pg.scrollLeft = step() * S.pagerIndex;
+    pg.addEventListener('scroll', () => {
+      const i = Math.round(pg.scrollLeft / step());
+      if(i !== (S.pagerIndex||0)){ S.pagerIndex = i; document.querySelectorAll('.pager-tabs button').forEach((b,j) => b.setAttribute('aria-selected', String(j===i))); }
+    }, {passive:true});
+  }
 }
 function tick(){
   if(!S.loaded) return;
@@ -1477,6 +1506,7 @@ const actions = {
     if(gained) toast(wasTop ? '1순위 해치움! 구름 2개' : CHEERS[Math.floor(Math.random()*CHEERS.length)]);
   },
   focus: el => mutateDay(el.dataset.k, day => { day.focus = day.focus===el.dataset.id ? null : el.dataset.id; }),
+  pagerGo: el => { const pg = document.getElementById('pager'); const i = Number(el.dataset.v); S.pagerIndex = i; if(pg){ const ps = pg.querySelectorAll('.pane'); const st = ps.length > 1 ? ps[1].offsetLeft - ps[0].offsetLeft : 0; pg.scrollTo({left: st * i, behavior: 'smooth'}); } document.querySelectorAll('.pager-tabs button').forEach((b,j) => b.setAttribute('aria-selected', String(j===i))); },
   rankPick: el => { S.rankPick = S.rankPick===el.dataset.id ? null : el.dataset.id; render(); },
   setRank: el => {
     const r = Number(el.dataset.r); S.rankPick = null;
@@ -1639,6 +1669,11 @@ document.addEventListener('input', e => {
   const el = e.target;
   if(el.dataset && el.dataset.enter==='add') S.draft[el.dataset.ctx].text = el.value;
   if(el.dataset && el.dataset.draft==='memo' && S.wrap) S.wrap.memo = el.value;
+  if(el.dataset && el.dataset.draft==='memopad'){
+    S.memo = {text: el.value, updatedAt: Date.now()}; save('memo', S.memo);
+    const st = document.getElementById('memo-stamp'); if(st) st.textContent = '저장하는 중…';
+    clearTimeout(S.memoTimer); S.memoTimer = setTimeout(() => { const e2 = document.getElementById('memo-stamp'); if(e2){ const d = new Date(); e2.textContent = '오늘 '+pad(d.getHours())+':'+pad(d.getMinutes())+' 저장'; } }, 900);
+  }
 });
 let pendingEnter = null;
 document.addEventListener('keydown', e => {
@@ -1668,6 +1703,7 @@ function applyData(all, meta){
   Object.keys(all).forEach(id => {
     if(isDirty(id)) return;
     if(id==='settings'){ S.settings = migrate(clone(all[id])); S.settingsExists = true; }
+    else if(id==='memo') S.memo = clone(all[id]);
     else if(id.startsWith('d-')) S.days[id.slice(2)] = clone(all[id]);
   });
   if(!S.settings) S.settings = clone(DEFAULT_SETTINGS);
