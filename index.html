@@ -386,7 +386,9 @@ h3{font-size:15px}
 .setup .lead{color:var(--muted);font-size:14px;text-align:center;margin:0}
 .setup .field input{width:100%}
 .setup ol{margin:0 0 4px;padding-left:20px;font-size:13.5px;color:var(--muted);display:grid;gap:3px}
-.err-msg{color:var(--alert);font-size:13px;min-height:18px;margin:4px 0}
+.err-msg{color:var(--alert);font-size:13px;min-height:18px;margin:4px 0;line-height:1.7}
+.err-msg a{color:var(--accent-ink);font-weight:700}
+.err-msg b{color:var(--ink)}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1734,7 +1736,13 @@ Object.assign(actions, {
       toast('구글 시트를 연결했어요');
     }catch(e){
       go.disabled = false; go.textContent = '연결하기';
-      err.textContent = e && e.code==='key' ? '비밀번호가 Code.gs에 적은 것과 달라요.' : '연결이 안 돼요. 웹 앱 URL과, 배포할 때 액세스를 "모든 사용자"로 했는지 확인해 주세요.';
+      if(e && e.code==='key'){ err.textContent = '비밀번호가 Code.gs에 적은 것과 달라요.'; return; }
+      const test = url+(url.includes('?')?'&':'?')+'key='+encodeURIComponent(key);
+      err.innerHTML = '연결이 안 돼요. 아래 링크를 눌러 새 탭에서 어떻게 보이는지 확인해 주세요.<br>'+
+        '<a href="'+esc(test)+'" target="_blank" rel="noopener">이 주소 직접 열어보기 ↗</a><br>'+
+        '· <b>{"ok":true …}</b> 글자가 보이면: 주소는 맞아요. 이 화면을 새로고침하고 다시 연결해요.<br>'+
+        '· <b>구글 로그인 화면</b>이 나오면: Apps Script 배포의 액세스를 "모든 사용자"로 바꿔야 해요.<br>'+
+        '· <b>아예 안 열리면</b>: 회사 인터넷이 구글 스크립트를 막고 있는 거예요.';
     }
   },
   localOnly: () => { LS.set('mung-localonly', true); store.kind = 'local'; S.view = 'today'; location.hash = '#today'; S.loaded = false; startStore(); },
