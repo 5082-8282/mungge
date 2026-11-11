@@ -1,5 +1,5 @@
 /* 뭉게뭉게 서비스 워커: 앱 화면을 기기에 저장해서 빨리 열고, 알림을 띄워요 */
-const CACHE = 'mung-v2';
+const CACHE = 'mung-v3';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
